@@ -8,7 +8,7 @@ export default function AuthCallbackPage() {
   const router = useRouter();
   const { session, loading } = useAuth();
   useEffect(() => {
-    if (!loading) router.push(session ? '/dashboard' : '/login');
+    if (!loading) router.push(session ? '/setup-profile' : '/login');
   }, [loading, session, router]);
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center px-4">

@@ -1,6 +1,9 @@
 "use client";
 import { useAuth } from '@/context/AuthContext';
+import { useEffect } from 'react';
 import { RequireAuth } from '@/components/auth/RequireAuth';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabaseClient';
 import { ClayCard } from '@/components/ui';
 
 export default function DashboardPage() {
@@ -8,7 +11,14 @@ export default function DashboardPage() {
 }
 
 function DashboardContent() {
+  const router = useRouter();
   const { user, signOut } = useAuth();
+  useEffect(() => {
+    if (!user) return;
+    supabase.from("profiles").select("profile_complete").eq("id", user.id).single().then(({ data }) => {
+      if (data && !data.profile_complete) router.push("/setup-profile");
+    });
+  }, [user]);
   return (
     <div className="min-h-screen bg-surface py-12 px-4">
       <div className="max-w-4xl mx-auto">
