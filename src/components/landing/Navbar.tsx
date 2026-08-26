@@ -4,6 +4,7 @@
  * Blurs and adds shadow on scroll.
  */
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { ClayButton } from '../ui';
@@ -18,6 +19,7 @@ const navLinks = [
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { session, user, loading, signOut } = useAuth();
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 20);
@@ -48,7 +50,7 @@ export function Navbar() {
             ))}
           </div>
           <div className="hidden md:block">
-            <ClayButton variant="secondary" size="sm">Login</ClayButton>
+            <Link href="/login" className="px-4 py-2 text-sm font-medium text-primary-600 bg-white rounded-xl shadow-[3px_3px_6px_#d1d9e6,-3px_-3px_6px_#ffffff] hover:shadow-[4px_4px_8px_#c1c9d6,-4px_-4px_8px_#ffffff] transition-all no-underline">Login</Link>
           </div>
           <button className="md:hidden p-2 rounded-xl bg-white shadow-[3px_3px_6px_#d1d9e6,-3px_-3px_6px_#ffffff] border-none cursor-pointer" onClick={() => setMobileOpen(!mobileOpen)} aria-label="Toggle menu">
             <svg className="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">

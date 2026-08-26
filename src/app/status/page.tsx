@@ -5,6 +5,7 @@
  * Check #5 expects to FAIL (error = RLS working correctly).
  */
 import { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import Link from 'next/link';
 import { ClayCard } from '@/components/ui';
 import { checkBackendHealth } from '@/lib/api';
@@ -38,6 +39,7 @@ export default function StatusPage() {
   const [backend, setBackend] = useState<CheckResult>({ status: 'checking', message: 'Checking...' });
   const [headers, setHeaders] = useState<CheckResult>({ status: 'checking', message: 'Checking...' });
   const [supabaseCheck, setSupabaseCheck] = useState<CheckResult>({ status: 'checking', message: 'Checking...' });
+  const [sessionCheck, setSessionCheck] = useState<CheckResult>({ status: "checking", message: "Checking..." });
   const [rls, setRls] = useState<CheckResult>({ status: 'checking', message: 'Checking...' });
 
   const checkEnvVars = useCallback(() => {
@@ -70,6 +72,18 @@ export default function StatusPage() {
     } catch (e) { setSupabaseCheck({ status: 'fail', message: `Could not reach Supabase: ${e instanceof Error ? e.message : 'Unknown'}` }); }
   }, []);
 
+  const checkSession = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { setSessionCheck({ status: "fail", message: "Not logged in — log in first to test this check." }); return; }
+    try {
+      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
+      const res = await fetch(API_BASE + "/api/auth/me", { headers: { Authorization: "Bearer " + session.access_token } });
+      const json = await res.json();
+      if (json.status === "ok" && json.data?.profile) setSessionCheck({ status: "pass", message: "Backend recognized session. Profile: " + JSON.stringify(json.data.profile).slice(0, 120) + "..." });
+      else setSessionCheck({ status: "fail", message: "Backend did not recognize session. Response: " + JSON.stringify(json) });
+    } catch (e) { setSessionCheck({ status: "fail", message: "Could not call /api/auth/me: " + (e instanceof Error ? e.message : "Unknown") }); }
+  }, []);
+
   const checkRLS = useCallback(async () => {
     setRls({ status: 'checking', message: 'Attempting anonymous SELECT on competency_domains...' });
     try {
@@ -85,13 +99,15 @@ export default function StatusPage() {
     checkBackend().then(ok => ok ? checkHeaders() : setHeaders({ status: 'fail', message: 'Skipped — backend not reachable.' }));
     checkSupabase();
     checkRLS();
-  }, [checkEnvVars, checkBackend, checkHeaders, checkSupabase, checkRLS]);
+    checkSession();
+  }, [checkEnvVars, checkBackend, checkHeaders, checkSupabase, checkRLS, checkSession]);
 
   const runAll = () => {
     checkEnvVars();
     checkBackend().then(ok => ok ? checkHeaders() : setHeaders({ status: 'fail', message: 'Skipped — backend not reachable.' }));
     checkSupabase();
     checkRLS();
+    checkSession();
   };
 
   return (
@@ -108,6 +124,7 @@ export default function StatusPage() {
           <StatusRow label="3. Backend security headers (Helmet)" result={headers} onRetry={checkHeaders} />
           <StatusRow label="4. Supabase project reachable" result={supabaseCheck} onRetry={checkSupabase} />
           <StatusRow label="5. RLS enforcement (anonymous blocked)" result={rls} onRetry={checkRLS} />
+          <StatusRow label="6. Backend recognizes session (GET /api/auth/me)" result={sessionCheck} onRetry={checkSession} />
         </ClayCard>
         <div className="mt-6 text-center">
           <button onClick={runAll} className="px-6 py-3 bg-gradient-to-r from-primary-500 to-cyan-400 text-white rounded-xl font-semibold shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] hover:shadow-[6px_6px_12px_#c1c9d6,-6px_-6px_12px_#ffffff] transition-all cursor-pointer border-none">Run All Checks</button>
