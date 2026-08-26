@@ -44,7 +44,7 @@ export default function StatusPage() {
 
   const checkEnvVars = useCallback(() => {
     setEnv({ status: 'checking', message: 'Checking...' });
-    const vars = { NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL, NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY };
+    const vars = { NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY };
     const missing = Object.entries(vars).filter(([, v]) => !v).map(([k]) => k);
     setEnv(missing.length > 0 ? { status: 'fail', message: `${missing.join(', ')} missing — check .env.local` } : { status: 'pass', message: 'All environment variables loaded.' });
   }, []);
@@ -76,10 +76,11 @@ export default function StatusPage() {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setSessionCheck({ status: "fail", message: "Not logged in — log in first to test this check." }); return; }
     try {
-      const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "";
-      const res = await fetch(API_BASE + "/api/auth/me", { headers: { Authorization: "Bearer " + session.access_token } });
-      const json = await res.json();
-      if (json.status === "ok" && json.data?.profile) setSessionCheck({ status: "pass", message: "Backend recognized session. Profile: " + JSON.stringify(json.data.profile).slice(0, 120) + "..." });
+      const { authGet } = await import("@/lib/api");
+      const resp = await authGet("/api/auth/me", session.access_token);
+      if (resp.error) { setSessionCheck({ status: "fail", message: "Could not call /api/auth/me: " + resp.error }); return; }
+      const json = resp.data as { status?: string; data?: { profile?: Record<string, unknown> } };
+      if (json.status === "ok" && json.data?.profile) setSessionCheck({ status: "pass", message: "Backend recognized session. Profile: " + JSON.stringify(json.data!.profile).slice(0, 120) + "..." });
       else setSessionCheck({ status: "fail", message: "Backend did not recognize session. Response: " + JSON.stringify(json) });
     } catch (e) { setSessionCheck({ status: "fail", message: "Could not call /api/auth/me: " + (e instanceof Error ? e.message : "Unknown") }); }
   }, []);
