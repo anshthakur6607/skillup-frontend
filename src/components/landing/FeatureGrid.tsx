@@ -1,35 +1,104 @@
 "use client";
 /**
- * FeatureGrid — 6 feature cards with icons, staggered entrance, hover lift.
+ * FeatureGrid — core platform capabilities displayed as clean cards.
+ * Uses lucide-react icons. Hover lift for the clay feel.
  */
-import { motion } from 'framer-motion';
-import { ClayCard } from '../ui';
+import { motion } from "framer-motion";
+import {
+  BarChart3,
+  BookOpen,
+  MessageSquare,
+  ClipboardCheck,
+  Award,
+  Settings,
+} from "lucide-react";
 
 const features = [
-  { icon: '🎯', title: 'AI Skill Gap Analysis', description: 'Identify exactly where your competencies fall short with intelligent gap analysis across statistical, technical, and governance skills.' },
-  { icon: '📚', title: 'Personalised Recommendations', description: 'Get course suggestions tailored to your specific skill gaps, role, and department — powered by AI that understands your learning journey.' },
-  { icon: '🤖', title: 'AI Tutor Chatbot', description: 'Ask questions, get explanations, and receive guided support from an AI tutor that understands your competency profile.' },
-  { icon: '📝', title: 'Adaptive Assessments', description: 'Tests that adapt to your level, pinpointing exactly where you struggle — from beginner concepts to advanced applications.' },
-  { icon: '🏆', title: 'Verified Certificates', description: 'Earn verifiable certificates upon course completion, with unique verification codes for authentic credential validation.' },
-  { icon: '📊', title: 'Admin Analytics', description: 'Department-level insights into workforce capabilities, training progress, and competency distributions — without exposing individual data.' },
+  {
+    icon: BarChart3,
+    title: "Skill Gap Analysis",
+    description:
+      "AI-driven assessment identifies where each official stands against the competency framework and highlights priority gaps.",
+  },
+  {
+    icon: BookOpen,
+    title: "Personalised Learning",
+    description:
+      "Curated course recommendations from iGOT Karmayogi and internal training resources, matched to individual skill gaps.",
+  },
+  {
+    icon: MessageSquare,
+    title: "AI Tutor",
+    description:
+      "An embedded chatbot that answers questions, explains concepts, and guides officials through learning materials at their own pace.",
+  },
+  {
+    icon: ClipboardCheck,
+    title: "Adaptive Assessments",
+    description:
+      "Dynamic question difficulty based on responses, with detailed breakdowns showing where understanding breaks down.",
+  },
+  {
+    icon: Award,
+    title: "Verified Certificates",
+    description:
+      "Tamper-proof digital certificates with verification hashes, linked to competency achievements and course completions.",
+  },
+  {
+    icon: Settings,
+    title: "Admin Analytics",
+    description:
+      "Department-level dashboards for managers and administrators to track organisational skill health and training progress.",
+  },
 ];
+
+const containerVariants = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.08 } },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
 
 export function FeatureGrid() {
   return (
-    <section id="features" className="py-16 sm:py-24 px-4 sm:px-6">
-      <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-50px' }} transition={{ duration: 0.6 }} className="text-center mb-12 sm:mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">Platform Capabilities</h2>
-          <p className="text-lg text-slate-500 max-w-2xl mx-auto">Everything you need to assess, learn, and master the competencies that drive India&apos;s statistical excellence.</p>
-        </motion.div>
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true, margin: '-50px' }} variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.1 } } }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <section id="features" className="py-24 bg-surface">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
+            Built for capacity building at scale
+          </h2>
+          <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+            From identifying skill gaps to issuing certificates, SkillUp covers
+            the entire learning lifecycle for government institutions.
+          </p>
+        </div>
+
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+          variants={containerVariants}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, margin: "-100px" }}
+        >
           {features.map((f) => (
-            <motion.div key={f.title} variants={{ hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0 } }}>
-              <ClayCard className="p-6 sm:p-8 h-full">
-                <div className="text-4xl mb-4">{f.icon}</div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">{f.title}</h3>
-                <p className="text-slate-500 leading-relaxed">{f.description}</p>
-              </ClayCard>
+            <motion.div
+              key={f.title}
+              variants={cardVariants}
+              whileHover={{ y: -4 }}
+              className="group p-6 rounded-2xl bg-white border border-slate-100 shadow-[6px_6px_12px_#d1d9e6,-6px_-6px_12px_#ffffff] hover:shadow-[8px_8px_16px_#c1c9d6,-8px_-8px_16px_#ffffff] transition-shadow"
+            >
+              <div className="w-11 h-11 rounded-xl bg-primary-50 flex items-center justify-center mb-4 group-hover:bg-primary-100 transition-colors">
+                <f.icon size={22} className="text-primary-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">
+                {f.title}
+              </h3>
+              <p className="text-slate-500 text-sm leading-relaxed">
+                {f.description}
+              </p>
             </motion.div>
           ))}
         </motion.div>

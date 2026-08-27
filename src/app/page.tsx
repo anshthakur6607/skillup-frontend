@@ -1,9 +1,16 @@
 /**
  * Home page — Server component that renders the landing page.
- * The landing sections are client components (they use framer-motion),
- * but this page itself is a server component for optimal performance.
+ * Sections are client components (framer-motion), this page is server-rendered.
  */
-import { Navbar, Hero, StatsSection, FeatureGrid, HowItWorks, Footer } from '@/components/landing';
+import {
+  Navbar,
+  Hero,
+  StatsSection,
+  FeatureGrid,
+  HowItWorks,
+  About,
+  Footer,
+} from "@/components/landing";
 
 export default function Home() {
   return (
@@ -13,6 +20,7 @@ export default function Home() {
       <StatsSection />
       <FeatureGrid />
       <HowItWorks />
+      <About />
       <Footer />
     </div>
   );

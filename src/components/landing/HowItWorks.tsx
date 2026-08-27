@@ -1,41 +1,87 @@
 "use client";
 /**
- * HowItWorks — 4-step timeline: Survey → Recommend → Learn → Assess
+ * HowItWorks — four-step flow showing the platform journey.
+ * Clean horizontal layout with connecting lines. No emoji.
  */
-import { motion } from 'framer-motion';
-import { ClayCard } from '../ui';
+import { motion } from "framer-motion";
+import { ClipboardList, Sparkles, GraduationCap, BadgeCheck } from "lucide-react";
 
 const steps = [
-  { number: 1, title: 'Survey', description: 'Take a quick self-assessment to establish your current competency levels.', icon: '📋' },
-  { number: 2, title: 'Recommend', description: 'AI analyses your gaps and suggests personalised learning paths.', icon: '💡' },
-  { number: 3, title: 'Learn', description: 'Access curated courses from iGOT Karmayogi, NSSTA TPAC, and internal content.', icon: '📖' },
-  { number: 4, title: 'Assess', description: 'Take adaptive assessments to validate your skills and earn certificates.', icon: '✅' },
+  {
+    icon: ClipboardList,
+    number: "01",
+    title: "Assess",
+    description:
+      "Complete a competency survey tailored to your role and department. The AI maps your current skill levels.",
+  },
+  {
+    icon: Sparkles,
+    number: "02",
+    title: "Analyse",
+    description:
+      "Skill gaps are identified against the framework. Your personalised learning path is generated automatically.",
+  },
+  {
+    icon: GraduationCap,
+    number: "03",
+    title: "Learn",
+    description:
+      "Access curated courses from iGOT Karmayogi and internal resources, guided by an AI tutor when you need help.",
+  },
+  {
+    icon: BadgeCheck,
+    number: "04",
+    title: "Certify",
+    description:
+      "Pass adaptive assessments and earn verified certificates that validate your competencies for career progression.",
+  },
 ];
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6">
-      <div className="max-w-6xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-50px' }} transition={{ duration: 0.6 }} className="text-center mb-12 sm:mb-16">
-          <h2 className="text-3xl sm:text-4xl font-bold text-slate-800 mb-4">How It Works</h2>
-          <p className="text-lg text-slate-500 max-w-2xl mx-auto">Four simple steps to transform your professional capabilities.</p>
-        </motion.div>
-        <div className="relative">
-          <div className="hidden lg:block absolute top-1/2 left-0 right-0 h-0.5 bg-gradient-to-r from-primary-200 via-cyan-200 to-primary-200 -translate-y-1/2" />
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-            {steps.map((s, i) => (
-              <motion.div key={s.number} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-50px' }} transition={{ duration: 0.5, delay: i * 0.15 }}>
-                <ClayCard className="p-6 text-center relative">
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-cyan-400 flex items-center justify-center shadow-[2px_2px_4px_#d1d9e6,-2px_-2px_4px_#ffffff]">
-                    <span className="text-white font-bold text-sm">{s.number}</span>
-                  </div>
-                  <div className="text-4xl mb-4 mt-2">{s.icon}</div>
-                  <h3 className="text-xl font-bold text-slate-800 mb-2">{s.title}</h3>
-                  <p className="text-sm text-slate-500 leading-relaxed">{s.description}</p>
-                </ClayCard>
-              </motion.div>
-            ))}
-          </div>
+    <section id="how-it-works" className="py-24 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
+            How SkillUp works
+          </h2>
+          <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+            A structured four-step journey from assessment to certification,
+            designed for busy government professionals.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 relative">
+          {/* Connector line — desktop only */}
+          <div className="hidden lg:block absolute top-14 left-[12.5%] right-[12.5%] h-px bg-gradient-to-r from-primary-200 via-cyan-200 to-primary-200" />
+
+          {steps.map((step, i) => (
+            <motion.div
+              key={step.title}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.12, duration: 0.5 }}
+              className="relative text-center"
+            >
+              {/* Icon circle */}
+              <div className="relative z-10 w-14 h-14 rounded-full bg-white border-2 border-primary-200 flex items-center justify-center mx-auto mb-5 shadow-sm">
+                <step.icon size={24} className="text-primary-600" />
+              </div>
+
+              {/* Step number */}
+              <div className="text-xs font-semibold text-primary-400 tracking-widest uppercase mb-2">
+                Step {step.number}
+              </div>
+
+              <h3 className="text-lg font-bold text-slate-800 mb-2">
+                {step.title}
+              </h3>
+              <p className="text-slate-500 text-sm leading-relaxed max-w-xs mx-auto">
+                {step.description}
+              </p>
+            </motion.div>
+          ))}
         </div>
       </div>
     </section>
