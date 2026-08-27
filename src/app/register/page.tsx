@@ -1,9 +1,9 @@
 "use client";
 /**
  * RegisterPage — create account with email/password and Google OAuth.
- * Only shows enabled OAuth providers. No emoji. Clean validation.
+ * Includes resend verification email functionality.
  */
-import { useState, type FormEvent } from "react";
+import { useState, useCallback, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,7 @@ import {
   ArrowRight,
   Loader2,
   CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 
 export default function RegisterPage() {
@@ -28,6 +29,8 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMessage, setResendMessage] = useState("");
 
   const validate = (): string | null => {
     if (!fullName.trim()) return "Full name is required.";
@@ -50,11 +53,16 @@ export default function RegisterPage() {
     setLoading(true);
     const { error: ae } = await signUp(email.trim(), password, fullName.trim());
     if (ae) {
-      setError(
-        ae.message.includes("rate")
-          ? "Too many attempts."
-          : "Could not create account. Please try again."
-      );
+      // Check if user already exists (Supabase returns this error)
+      if (ae.message.includes("already registered") || ae.message.includes("already been registered")) {
+        setError(
+          "An account with this email already exists. Please sign in instead."
+        );
+      } else if (ae.message.includes("rate")) {
+        setError("Too many attempts. Please wait a moment.");
+      } else {
+        setError("Could not create account. Please try again.");
+      }
       setLoading(false);
       return;
     }
@@ -66,6 +74,31 @@ export default function RegisterPage() {
     const { error: ae } = await signInWithOAuth("google");
     if (ae) setError("Could not start Google sign-up. Please try again.");
   };
+
+  const handleResendVerification = useCallback(async () => {
+    if (!email.trim()) return;
+    setResending(true);
+    setResendMessage("");
+    try {
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      if (res.status === 429) {
+        setResendMessage("Too many requests. Please wait 10 minutes.");
+      } else {
+        setResendMessage(
+          data.message || "If that email is registered, a verification link has been sent."
+        );
+      }
+    } catch {
+      setResendMessage("Could not send verification email. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  }, [email]);
 
   if (emailSent) {
     return (
@@ -90,12 +123,34 @@ export default function RegisterPage() {
             <strong className="text-slate-700">{email}</strong>. Click the link
             to verify your account.
           </p>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-slate-900 text-white text-sm font-medium no-underline hover:bg-slate-800 transition-colors"
-          >
-            Go to Sign In
-          </Link>
+
+          {resendMessage && (
+            <div className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm">
+              {resendMessage}
+            </div>
+          )}
+
+          <div className="space-y-3">
+            <button
+              onClick={handleResendVerification}
+              disabled={resending}
+              className="w-full py-3 bg-white text-slate-600 rounded-xl font-semibold border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+            >
+              {resending ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <RefreshCw size={16} />
+              )}
+              {resending ? "Sending..." : "Resend verification email"}
+            </button>
+
+            <Link
+              href="/login"
+              className="inline-flex items-center justify-center w-full gap-2 px-6 py-3 rounded-xl bg-slate-900 text-white text-sm font-medium no-underline hover:bg-slate-800 transition-colors"
+            >
+              Go to Sign In
+            </Link>
+          </div>
         </ClayCard>
       </div>
     );
