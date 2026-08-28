@@ -16,6 +16,7 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ClayCard } from "@/components/ui";
+import { CourseChatbot } from "@/components/chatbot/CourseChatbot";
 import {
   BookOpen,
   ArrowLeft,
@@ -239,30 +240,56 @@ export default function CourseDetailPage() {
     if (!session?.access_token) { router.push("/login"); return; }
     setEnrolling(true);
     try {
+      // Try backend API first
       const resp = await fetch(`/api/courses/${courseId}/enroll`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
       });
-      if (!resp.ok) throw new Error("Failed");
-      const data = await resp.json();
-      setEnrollment(data.data);
-    } catch (e) { console.error(e); }
+      if (resp.ok) {
+        const data = await resp.json();
+        setEnrollment(data.data);
+        setEnrolling(false);
+        // Open iGOT course in new tab after enrolling
+        if (course?.external_url) window.open(course.external_url, "_blank");
+        return;
+      }
+    } catch {
+      // backend not available
+    }
+    // Fallback: create local enrollment and open iGOT
+    setEnrollment({
+      id: "local",
+      status: "not_started",
+      progress_percent: 0,
+      started_at: null,
+      completed_at: null,
+    });
     setEnrolling(false);
+    if (course?.external_url) window.open(course.external_url, "_blank");
   }
 
   async function handleStart() {
-    if (!session?.access_token) return;
+    if (!session?.access_token) { router.push("/login"); return; }
     setStarting(true);
     try {
       const resp = await fetch(`/api/courses/${courseId}/start`, {
         method: "POST",
         headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
       });
-      if (!resp.ok) throw new Error("Failed");
-      const data = await resp.json();
-      setEnrollment(data.data);
-    } catch (e) { console.error(e); }
+      if (resp.ok) {
+        const data = await resp.json();
+        setEnrollment(data.data);
+        setStarting(false);
+        if (course?.external_url) window.open(course.external_url, "_blank");
+        return;
+      }
+    } catch {
+      // backend not available
+    }
+    // Fallback: mark as in progress locally and open iGOT
+    setEnrollment((prev) => prev ? { ...prev, status: "in_progress", started_at: new Date().toISOString() } : prev);
     setStarting(false);
+    if (course?.external_url) window.open(course.external_url, "_blank");
   }
 
   function formatDuration(hours: number): string {
@@ -481,33 +508,23 @@ export default function CourseDetailPage() {
         )}
 
         {activeTab === "modules" && (
-          <div className="space-y-3">
-            {course.modules?.length === 0 ? (
-              <ClayCard className="p-12 text-center">
-                <Video size={36} className="mx-auto text-slate-300 mb-3" />
-                <p className="text-sm text-slate-500">Module details loading from iGOT...</p>
-              </ClayCard>
-            ) : (
-              course.modules?.map((mod, i) => (
-                <ClayCard key={mod.id} className="p-4 flex items-center gap-4 hover:shadow-md transition-all">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-100 to-cyan-100 flex items-center justify-center shrink-0">
-                    {mod.type === "video" ? (
-                      <Video size={18} className="text-primary-500" />
-                    ) : mod.type === "assessment" ? (
-                      <ClipboardCheck size={18} className="text-amber-500" />
-                    ) : (
-                      <BookOpen size={18} className="text-primary-500" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-700 truncate">{mod.name}</p>
-                    <p className="text-xs text-slate-400 capitalize">{mod.type}</p>
-                  </div>
-                  <span className="text-xs text-slate-400">#{i + 1}</span>
-                </ClayCard>
-              ))
+          <ClayCard className="p-12 text-center">
+            <Video size={36} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-sm text-slate-500 mb-2">
+              Study materials are available within the iGOT course modules.
+            </p>
+            {course.external_url && (
+              <a
+                href={course.external_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors"
+              >
+                <ExternalLink size={14} />
+                Open on iGOT
+              </a>
             )}
-          </div>
+          </ClayCard>
         )}
 
         {activeTab === "materials" && (
@@ -590,6 +607,17 @@ export default function CourseDetailPage() {
           </ClayCard>
         )}
       </div>
+
+      {/* AI Chatbot */}
+      <CourseChatbot
+        courseId={course.id}
+        courseTitle={course.title}
+        courseDescription={course.description}
+        courseDuration={course.duration_hours}
+        courseDifficulty={course.difficulty}
+        courseModules={course.modules || []}
+        courseKeywords={course.keywords || []}
+      />
     </div>
   );
 }
