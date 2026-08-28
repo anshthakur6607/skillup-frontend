@@ -2,12 +2,12 @@
 
 /**
  * Learn Hub — browse and discover courses.
- * Features search, category filters, and course cards.
- * Inspired by iGOT Karmayogi Learn Hub.
+ * Features search, source filters, and course cards.
+ * Fetches from /api/courses (public endpoint, no auth needed).
  */
+
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/context/AuthContext";
 import { ClayCard } from "@/components/ui";
 import { motion } from "framer-motion";
 import {
@@ -15,10 +15,12 @@ import {
   BookOpen,
   Clock,
   Filter,
-  Star,
-  Users,
   ArrowRight,
   Loader2,
+  Building2,
+  GraduationCap,
+  Globe,
+  ExternalLink,
 } from "lucide-react";
 
 interface Course {
@@ -27,16 +29,22 @@ interface Course {
   description: string;
   source: string;
   duration_hours: number;
+  external_url: string;
   is_active: boolean;
 }
 
-const DOMAINS = [
-  { id: "all", label: "All Courses" },
-  { id: "statistical", label: "Statistical" },
-  { id: "technical", label: "Technical" },
-  { id: "digital", label: "Digital Governance" },
-  { id: "behavioural", label: "Behavioural" },
+const SOURCE_FILTERS = [
+  { id: "all", label: "All Courses", icon: Globe },
+  { id: "igot", label: "iGOT Karmayogi", icon: BookOpen },
+  { id: "nssta_tpac", label: "NSSTA TPAC", icon: Building2 },
+  { id: "internal", label: "Internal", icon: GraduationCap },
 ];
+
+const SOURCE_COLORS: Record<string, string> = {
+  igot: "bg-blue-50 text-blue-700",
+  nssta_tpac: "bg-cyan-50 text-cyan-700",
+  internal: "bg-purple-50 text-purple-700",
+};
 
 const fadeUp = {
   hidden: { opacity: 0, y: 15 },
@@ -45,50 +53,31 @@ const fadeUp = {
 
 export default function LearnHubPage() {
   const router = useRouter();
-  const { session } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [filtered, setFiltered] = useState<Course[]>([]);
   const [search, setSearch] = useState("");
-  const [activeDomain, setActiveDomain] = useState("all");
+  const [activeSource, setActiveSource] = useState("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!session) return;
     const fetchCourses = async () => {
       try {
-        // Try the new courses API first (service-role, bypasses RLS)
         const res = await fetch("/api/courses?limit=50");
         if (res.ok) {
           const data = await res.json();
           if (data.data) {
             setCourses(data.data);
             setFiltered(data.data);
-            setLoading(false);
-            return;
           }
         }
       } catch {
-        // fallback below
-      }
-
-      try {
-        // Fallback to dashboard API
-        const res = await fetch("/api/dashboard/courses", {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        const data = await res.json();
-        if (data.status === "ok") {
-          setCourses(data.data || []);
-          setFiltered(data.data || []);
-        }
-      } catch {
-        // Use empty array
+        // empty
       } finally {
         setLoading(false);
       }
     };
     fetchCourses();
-  }, [session]);
+  }, []);
 
   const applyFilters = useCallback(() => {
     let result = [...courses];
@@ -100,14 +89,13 @@ export default function LearnHubPage() {
           c.description?.toLowerCase().includes(q)
       );
     }
-    if (activeDomain !== "all") {
-      // Filter by source/domain
+    if (activeSource !== "all") {
       result = result.filter(
-        (c) => c.source?.toLowerCase() === activeDomain.toLowerCase()
+        (c) => c.source?.toLowerCase() === activeSource.toLowerCase()
       );
     }
     setFiltered(result);
-  }, [courses, search, activeDomain]);
+  }, [courses, search, activeSource]);
 
   useEffect(() => {
     applyFilters();
@@ -141,19 +129,23 @@ export default function LearnHubPage() {
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-slate-400" />
           <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {DOMAINS.map((d) => (
-              <button
-                key={d.id}
-                onClick={() => setActiveDomain(d.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer border-none transition-all ${
-                  activeDomain === d.id
-                    ? "bg-gradient-to-r from-primary-500 to-cyan-400 text-white shadow-[2px_2px_4px_#d1d9e6,-2px_-2px_4px_#ffffff]"
-                    : "bg-white text-slate-600 hover:bg-slate-50 shadow-[2px_2px_4px_#d1d9e6,-2px_-2px_4px_#ffffff]"
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
+            {SOURCE_FILTERS.map((f) => {
+              const Icon = f.icon;
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveSource(f.id)}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer border-none transition-all ${
+                    activeSource === f.id
+                      ? "bg-gradient-to-r from-primary-500 to-cyan-400 text-white shadow-[2px_2px_4px_#d1d9e6,-2px_-2px_4px_#ffffff]"
+                      : "bg-white text-slate-600 hover:bg-slate-50 shadow-[2px_2px_4px_#d1d9e6,-2px_-2px_4px_#ffffff]"
+                  }`}
+                >
+                  <Icon size={12} />
+                  {f.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -179,40 +171,62 @@ export default function LearnHubPage() {
         >
           {filtered.map((course) => (
             <motion.div key={course.id} variants={fadeUp}>
-              <div onClick={() => router.push(`/courses/${course.id}`)} className="cursor-pointer">
-              <ClayCard className="p-5 h-full flex flex-col group hover:shadow-lg transition-all">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-cyan-100 flex items-center justify-center shrink-0 group-hover:from-primary-200 group-hover:to-cyan-200 transition-colors">
-                    <BookOpen size={20} className="text-primary-500" />
+              <div
+                onClick={() => router.push(`/courses/${course.id}`)}
+                className="cursor-pointer"
+              >
+                <ClayCard className="p-5 h-full flex flex-col group hover:shadow-lg transition-all">
+                  <div className="flex items-start gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-cyan-100 flex items-center justify-center shrink-0 group-hover:from-primary-200 group-hover:to-cyan-200 transition-colors">
+                      <BookOpen size={20} className="text-primary-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-slate-800 line-clamp-2">
+                        {course.title}
+                      </h3>
+                      <span
+                        className={`text-[10px] px-2 py-0.5 rounded-full font-medium inline-block mt-1 ${
+                          SOURCE_COLORS[course.source] ||
+                          "bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {course.source === "igot"
+                          ? "iGOT"
+                          : course.source === "nssta_tpac"
+                          ? "NSSTA TPAC"
+                          : course.source}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-slate-800 line-clamp-2">
-                      {course.title}
-                    </h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary-50 text-primary-600 font-medium inline-block mt-1">
-                      {course.source}
-                    </span>
+                  <p className="text-xs text-slate-500 line-clamp-2 flex-1">
+                    {course.description || "No description available."}
+                  </p>
+                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      {course.duration_hours && (
+                        <span className="flex items-center gap-1">
+                          <Clock size={12} />
+                          {course.duration_hours}h
+                        </span>
+                      )}
+                      <span className="flex items-center gap-1 text-primary-500 font-medium">
+                        View Details <ArrowRight size={12} />
+                      </span>
+                    </div>
+                    {course.external_url && (
+                      <a
+                        href={course.external_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-[10px] text-slate-400 hover:text-primary-500 transition-colors"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink size={10} />
+                        iGOT
+                      </a>
+                    )}
                   </div>
-                </div>
-                <p className="text-xs text-slate-500 line-clamp-2 flex-1">
-                  {course.description || "No description available."}
-                </p>
-                <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} />
-                      {course.duration_hours}h
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Star size={12} className="text-amber-400" />
-                      4.{Math.floor(Math.random() * 5) + 3}
-                    </span>
-                  </div>
-                  <button className="flex items-center gap-1 text-xs font-medium text-primary-500 hover:text-primary-600 cursor-pointer border-none bg-transparent p-0">
-                    Enroll <ArrowRight size={12} />
-                  </button>
-                </div>
-              </ClayCard>
+                </ClayCard>
               </div>
             </motion.div>
           ))}
@@ -224,7 +238,9 @@ export default function LearnHubPage() {
             No courses found
           </h3>
           <p className="text-sm text-slate-500">
-            Try adjusting your search or filters.
+            {search
+              ? "Try a different search term"
+              : "Run the seed.sql in Supabase to populate courses"}
           </p>
         </ClayCard>
       )}
