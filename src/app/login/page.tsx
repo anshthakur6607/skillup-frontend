@@ -1,16 +1,17 @@
-/**
- * LoginPage — email/password and Google OAuth login.
- * Uses claymorphism design system. Only shows enabled OAuth providers.
- * Error messages are generic to prevent account enumeration.
- */
 "use client";
 
+/**
+ * LoginPage — email/password and Google OAuth login.
+ * After login, checks profile completion and redirects accordingly:
+ * - Profile incomplete → /setup-profile
+ * - Profile complete → /dashboard
+ */
 import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ClayCard, FloatingShape } from "@/components/ui";
-import { Mail, Lock, ArrowRight, Loader2, KeyRound } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,21 +27,61 @@ export default function LoginPage() {
   const [resetSent, setResetSent] = useState(false);
   const [resetMessage, setResetMessage] = useState("");
 
+  /**
+   * After successful login, check if the user has completed their profile.
+   * Redirect to /setup-profile or /dashboard accordingly.
+   */
+  const checkProfileAndRedirect = async (session: { access_token: string }) => {
+    try {
+      const res = await fetch("/api/auth/profile-status", {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const data = await res.json();
+      if (data.status === "ok" && data.data?.profileComplete) {
+        router.push("/dashboard");
+      } else {
+        router.push("/setup-profile");
+      }
+    } catch {
+      // If we can't check profile status, default to setup-profile
+      router.push("/setup-profile");
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    // We need to sign in and get the session to check profile status
     const { error: authError } = await signIn(email.trim(), password);
     if (authError) {
       setError(
         authError.message.includes("rate")
           ? "Too many attempts. Please wait and try again."
+          : authError.message.includes("Email not confirmed")
+          ? "Please verify your email before signing in. Check your inbox for the confirmation link."
           : "Invalid email or password. Please try again."
       );
       setLoading(false);
       return;
     }
-    router.push("/setup-profile");
+
+    // Wait a moment for Supabase to set the session
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    // Get the session from Supabase
+    const { supabase } = await import("@/lib/supabaseClient");
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session?.access_token) {
+      await checkProfileAndRedirect(session);
+    } else {
+      router.push("/setup-profile");
+    }
+    setLoading(false);
   };
 
   const handleGoogleSignIn = async () => {
@@ -92,9 +133,7 @@ export default function LoginPage() {
 
         <ClayCard className="p-8">
           <h1 className="text-2xl font-bold text-slate-800 mb-1">Welcome back</h1>
-          <p className="text-slate-500 text-sm mb-6">
-            Sign in to your account
-          </p>
+          <p className="text-slate-500 text-sm mb-6">Sign in to your account</p>
 
           {error && (
             <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
