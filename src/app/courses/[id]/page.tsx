@@ -111,22 +111,94 @@ export default function CourseDetailPage() {
   }, [enrollment?.status]);
 
   async function loadCourse() {
+    // Try backend API first
     try {
       const headers: Record<string, string> = {};
       if (session?.access_token) {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
       const resp = await fetch(`/api/courses/${courseId}`, { headers });
-      if (!resp.ok) throw new Error("Course not found");
-      const data = await resp.json();
-      setCourse(data.data);
-      if (data.enrollment) {
-        setEnrollment(data.enrollment);
-        if (data.enrollment.status === "completed") {
-          setProgress(100);
-          setCompleted(true);
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.data) {
+          setCourse(data.data);
+          if (data.enrollment) {
+            setEnrollment(data.enrollment);
+            if (data.enrollment.status === "completed") {
+              setProgress(100);
+              setCompleted(true);
+            }
+          }
+          setLoading(false);
+          return;
         }
       }
+    } catch {
+      // backend not available, fetch from iGOT directly
+    }
+
+    // Fetch directly from iGOT content API
+    try {
+      const resp = await fetch(
+        `https://igotkarmayogi.gov.in/api/content/v1/read/${courseId}`,
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (!resp.ok) throw new Error("Course not found");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const raw: any = await resp.json();
+      const c = raw?.result?.content;
+      if (!c) throw new Error("Course not found");
+
+      const stripHtml = (h: string) => h.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
+
+      // Fetch module names
+      const modIds: string[] = c.childNodes || [];
+      const modules: Array<{ id: string; name: string; type: string; index: number }> = [];
+      for (let i = 0; i < modIds.length; i += 5) {
+        const batch = modIds.slice(i, i + 5);
+        const results = await Promise.allSettled(
+          batch.map(async (nid) => {
+            try {
+              const r = await fetch(`https://igotkarmayogi.gov.in/api/content/v1/read/${nid}`, { signal: AbortSignal.timeout(5000) });
+              if (!r.ok) return null;
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const d: any = await r.json();
+              const m = d?.result?.content;
+              if (!m) return null;
+              return {
+                id: m.identifier || nid,
+                name: m.name || 'Untitled',
+                type: m.mimeType?.includes('video') ? 'video' : m.mimeType?.includes('quiz') || m.mimeType?.includes('question') ? 'assessment' : m.primaryCategory === 'CourseUnit' ? 'module' : 'resource',
+                index: i + batch.indexOf(nid),
+              };
+            } catch { return null; }
+          })
+        );
+        for (const r of results) {
+          if (r.status === 'fulfilled' && r.value) modules.push(r.value);
+        }
+      }
+      modules.sort((a, b) => a.index - b.index);
+      const typedModules = modules as unknown as Module[];
+
+      setCourse({
+        id: c.identifier || courseId,
+        title: c.name || 'Untitled Course',
+        description: stripHtml(c.description || ''),
+        source: 'igot',
+        duration_hours: Math.round((parseInt(c.duration || '0') / 3600) * 10) / 10 || 0.5,
+        external_url: `https://portal.igotkarmayogi.gov.in/public/toc/${c.identifier || courseId}/overview`,
+        is_active: true,
+        difficulty: c.difficultyLevel || 'Beginner',
+        creator: c.creator || '',
+        organisation: c.organisation?.[0] || '',
+        keywords: c.keywords?.slice(0, 10) || [],
+        instructions: stripHtml(c.instructions || ''),
+        modules: typedModules,
+        module_count: typedModules.length,
+        poster_image: c.posterImage || '',
+        app_icon: c.appIcon || '',
+      });
     } catch (err) {
       console.error("Failed to load course:", err);
     }
