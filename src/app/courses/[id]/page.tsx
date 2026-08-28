@@ -1,16 +1,15 @@
 "use client";
 /**
- * Course Detail Page — view course info, enroll, start, and monitor auto-completion.
+ * Course Detail Page — full course view with tabs.
  *
- * Dummy monitoring system:
- * - When user clicks "Start Course", we POST to /api/courses/:id/start
- * - The server sets started_at = now
- * - This page polls GET /api/courses/:id/progress every 1 second
- * - The server computes progress based on elapsed time vs course duration
- *   (compressed for demo: short courses complete in 10s, medium in 30s, long in 60s)
- * - When progress hits 100%, the server marks the course as completed
- *   and generates a certificate automatically
- * - The UI shows a live progress bar and countdown timer
+ * Tabs:
+ * 1. Overview — description, objectives, metadata
+ * 2. Modules — list of modules/videos from iGOT
+ * 3. Study Materials — resources and documents
+ * 4. Assessments — quizzes and tests
+ * 5. Tasks — assignments and activities
+ *
+ * Also handles enroll, start, and auto-completion monitoring.
  */
 
 import { useEffect, useState, useRef, useCallback } from "react";
@@ -26,10 +25,24 @@ import {
   CheckCircle2,
   Play,
   Award,
-  RefreshCw,
+  FileText,
+  Video,
+  ClipboardCheck,
+  ListChecks,
+  Target,
+  BarChart3,
+  Users,
+  Tag,
 } from "lucide-react";
 
-interface Course {
+interface Module {
+  id: string;
+  name: string;
+  type: "video" | "assessment" | "module" | "resource";
+  index: number;
+}
+
+interface CourseDetail {
   id: string;
   title: string;
   description: string;
@@ -37,9 +50,15 @@ interface Course {
   duration_hours: number;
   external_url: string;
   is_active: boolean;
-  course_competencies?: Array<{
-    competencies: { id: string; name: string; description: string } | null;
-  }>;
+  difficulty: string;
+  creator: string;
+  organisation: string;
+  keywords: string[];
+  instructions: string;
+  modules: Module[];
+  module_count: number;
+  poster_image: string;
+  app_icon: string;
 }
 
 interface Enrollment {
@@ -50,17 +69,23 @@ interface Enrollment {
   completed_at: string | null;
 }
 
-interface ProgressData {
-  data: Enrollment | null;
-}
+type TabId = "overview" | "modules" | "materials" | "assessments" | "tasks";
+
+const TABS: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
+  { id: "overview", label: "Overview", icon: <FileText size={14} /> },
+  { id: "modules", label: "Modules", icon: <Video size={14} /> },
+  { id: "materials", label: "Study Materials", icon: <BookOpen size={14} /> },
+  { id: "assessments", label: "Assessments", icon: <ClipboardCheck size={14} /> },
+  { id: "tasks", label: "Tasks", icon: <ListChecks size={14} /> },
+];
 
 export default function CourseDetailPage() {
   const router = useRouter();
   const params = useParams();
   const courseId = (params?.id as string) || "";
-  const { session, user } = useAuth();
+  const { session } = useAuth();
 
-  const [course, setCourse] = useState<Course | null>(null);
+  const [course, setCourse] = useState<CourseDetail | null>(null);
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -68,21 +93,18 @@ export default function CourseDetailPage() {
   const [starting, setStarting] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
   const [completed, setCompleted] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("overview");
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch course details
   useEffect(() => {
-    loadCourse();
+    if (courseId) loadCourse();
   }, [courseId]);
 
-  // Poll progress when in_progress
   useEffect(() => {
     if (enrollment?.status !== "in_progress") return;
-
     pollProgress();
     pollRef.current = setInterval(pollProgress, 1000);
-
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
     };
@@ -94,11 +116,9 @@ export default function CourseDetailPage() {
       if (session?.access_token) {
         headers["Authorization"] = `Bearer ${session.access_token}`;
       }
-
       const resp = await fetch(`/api/courses/${courseId}`, { headers });
       if (!resp.ok) throw new Error("Course not found");
       const data = await resp.json();
-
       setCourse(data.data);
       if (data.enrollment) {
         setEnrollment(data.enrollment);
@@ -115,35 +135,28 @@ export default function CourseDetailPage() {
 
   async function pollProgress() {
     if (!session?.access_token) return;
-
     try {
       const resp = await fetch(`/api/courses/${courseId}/progress`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!resp.ok) return;
-
-      const data: ProgressData = await resp.json();
+      const data = await resp.json();
       if (!data.data) return;
-
       setEnrollment(data.data);
       setProgress(data.data.progress_percent || 0);
-
       if (data.data.status === "completed") {
         setCompleted(true);
         if (pollRef.current) clearInterval(pollRef.current);
       }
-
-      // Calculate time left
       if (data.data.started_at && data.data.status !== "completed") {
         const elapsed = Date.now() - new Date(data.data.started_at).getTime();
-        const durationHrs = course?.duration_hours || 4;
-        let targetSeconds: number;
-        if (durationHrs <= 2) targetSeconds = 10;
-        else if (durationHrs <= 8) targetSeconds = 30;
-        else targetSeconds = 60;
-
-        const remaining = Math.max(0, targetSeconds - elapsed / 1000);
-        setTimeLeft(Math.round(remaining));
+        const dur = course?.duration_hours || 1;
+        let targetSec: number;
+        if (dur <= 0.5) targetSec = 10;
+        else if (dur <= 2) targetSec = 20;
+        else if (dur <= 8) targetSec = 30;
+        else targetSec = 60;
+        setTimeLeft(Math.max(0, Math.round(targetSec - elapsed / 1000)));
       }
     } catch {
       // silent
@@ -151,25 +164,17 @@ export default function CourseDetailPage() {
   }
 
   async function handleEnroll() {
-    if (!session?.access_token) {
-      router.push("/login");
-      return;
-    }
+    if (!session?.access_token) { router.push("/login"); return; }
     setEnrolling(true);
     try {
       const resp = await fetch(`/api/courses/${courseId}/enroll`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
       });
-      if (!resp.ok) throw new Error("Failed to enroll");
+      if (!resp.ok) throw new Error("Failed");
       const data = await resp.json();
       setEnrollment(data.data);
-    } catch (err) {
-      console.error("Enroll failed:", err);
-    }
+    } catch (e) { console.error(e); }
     setEnrolling(false);
   }
 
@@ -179,32 +184,31 @@ export default function CourseDetailPage() {
     try {
       const resp = await fetch(`/api/courses/${courseId}/start`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          "Content-Type": "application/json",
-        },
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
       });
-      if (!resp.ok) throw new Error("Failed to start");
+      if (!resp.ok) throw new Error("Failed");
       const data = await resp.json();
       setEnrollment(data.data);
-    } catch (err) {
-      console.error("Start failed:", err);
-    }
+    } catch (e) { console.error(e); }
     setStarting(false);
   }
 
-  function formatTime(seconds: number): string {
-    if (seconds <= 0) return "0s";
-    if (seconds < 60) return `${seconds}s`;
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  function formatDuration(hours: number): string {
+    if (hours < 1) return `${Math.round(hours * 60)} min`;
+    if (hours === 1) return "1 hour";
+    return `${hours} hours`;
   }
 
-  // Get competencies from course
-  const competencies = (course?.course_competencies || [])
-    .map((cc) => cc.competencies)
-    .filter(Boolean) as Array<{ id: string; name: string; description: string }>;
+  function formatTime(s: number): string {
+    if (s <= 0) return "0s";
+    if (s < 60) return `${s}s`;
+    return `${Math.floor(s / 60)}m ${s % 60}s`;
+  }
+
+  // Split modules by type
+  const videos = course?.modules?.filter((m) => m.type === "video") || [];
+  const assessments = course?.modules?.filter((m) => m.type === "assessment") || [];
+  const resources = course?.modules?.filter((m) => m.type === "resource" || m.type === "module") || [];
 
   if (loading) {
     return (
@@ -218,13 +222,8 @@ export default function CourseDetailPage() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-lg font-semibold text-slate-700">
-            Course not found
-          </h2>
-          <button
-            onClick={() => router.push("/courses")}
-            className="mt-4 text-sm text-primary-600 hover:text-primary-700"
-          >
+          <h2 className="text-lg font-semibold text-slate-700">Course not found</h2>
+          <button onClick={() => router.push("/dashboard/learn")} className="mt-4 text-sm text-primary-600 hover:underline">
             Back to courses
           </button>
         </div>
@@ -233,190 +232,291 @@ export default function CourseDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto">
-        {/* Back */}
-        <button
-          onClick={() => router.push("/courses")}
-          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6 cursor-pointer"
-        >
-          <ArrowLeft size={14} />
-          Back to courses
-        </button>
+    <div className="min-h-screen bg-slate-50">
+      {/* Hero Banner */}
+      <div className="bg-gradient-to-r from-primary-600 to-cyan-500 text-white">
+        <div className="max-w-5xl mx-auto px-4 py-8">
+          <button
+            onClick={() => router.push("/dashboard/learn")}
+            className="flex items-center gap-1.5 text-sm text-white/70 hover:text-white mb-6 cursor-pointer"
+          >
+            <ArrowLeft size={14} /> Back to Learn Hub
+          </button>
 
-        {/* Course Info */}
-        <ClayCard className="p-6 mb-6">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-col md:flex-row gap-6">
             <div className="flex-1">
-              <span className="text-[10px] uppercase tracking-wider font-medium px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-100">
-                {course.source === "igot"
-                  ? "iGOT Karmayogi"
-                  : course.source === "nssta_tpac"
-                  ? "NSSTA TPAC"
-                  : "Internal"}
-              </span>
-              <h1 className="text-xl font-bold text-slate-800 mt-3">
-                {course.title}
-              </h1>
-            </div>
-            {course.duration_hours && (
-              <div className="flex items-center gap-1.5 text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl">
-                <Clock size={14} />
-                {course.duration_hours}h
-              </div>
-            )}
-          </div>
-          <p className="text-sm text-slate-600 leading-relaxed">
-            {course.description}
-          </p>
-
-          {course.external_url && (
-            <a
-              href={course.external_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 mt-4 text-sm text-primary-600 hover:text-primary-700"
-            >
-              <ExternalLink size={14} />
-              View on original platform
-            </a>
-          )}
-        </ClayCard>
-
-        {/* Competencies */}
-        {competencies.length > 0 && (
-          <ClayCard className="p-6 mb-6">
-            <h3 className="text-sm font-semibold text-slate-700 mb-3">
-              Skills You&apos;ll Build
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {competencies.map((c) => (
-                <span
-                  key={c.id}
-                  className="text-xs bg-primary-50 text-primary-700 px-3 py-1 rounded-xl border border-primary-100"
-                >
-                  {c.name}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-white/20 font-medium">
+                  {course.source === "igot" ? "iGOT Karmayogi" : course.source}
                 </span>
-              ))}
-            </div>
-          </ClayCard>
-        )}
-
-        {/* Progress / Action Card */}
-        <ClayCard className="p-6">
-          {completed || enrollment?.status === "completed" ? (
-            /* ─── COMPLETED STATE ─── */
-            <div className="text-center">
-              <CheckCircle2
-                size={48}
-                className="mx-auto text-green-500 mb-4"
-              />
-              <h3 className="text-lg font-bold text-slate-800 mb-2">
-                Course Completed
-              </h3>
-              <p className="text-sm text-slate-500 mb-4">
-                Congratulations! You&apos;ve finished this course.
+                <span className="text-xs px-2 py-0.5 rounded-full bg-white/20">
+                  {course.difficulty}
+                </span>
+              </div>
+              <h1 className="text-2xl font-bold mb-3">{course.title}</h1>
+              <p className="text-sm text-white/80 line-clamp-3 mb-4">
+                {course.description}
               </p>
-              <div className="flex items-center justify-center gap-2 text-sm text-amber-600">
-                <Award size={16} />
-                Certificate generated
-              </div>
-            </div>
-          ) : enrollment?.status === "in_progress" ? (
-            /* ─── IN PROGRESS STATE ─── */
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-700">
-                  Course In Progress
-                </h3>
-                <span className="text-sm font-mono text-primary-600">
-                  {progress}%
+              <div className="flex flex-wrap items-center gap-4 text-sm text-white/70">
+                <span className="flex items-center gap-1">
+                  <Clock size={14} /> {formatDuration(course.duration_hours)}
                 </span>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden mb-4">
-                <div
-                  className="h-full bg-gradient-to-r from-primary-500 to-cyan-500 rounded-full transition-all duration-1000 ease-linear"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-slate-500">
-                <span>
-                  {progress < 100
-                    ? "Auto-completing based on course duration..."
-                    : "Finalizing..."}
+                <span className="flex items-center gap-1">
+                  <Target size={14} /> {course.module_count} modules
                 </span>
-                {timeLeft > 0 && progress < 100 && (
-                  <span className="font-mono">
-                    ~{formatTime(timeLeft)} remaining
+                {course.organisation && (
+                  <span className="flex items-center gap-1">
+                    <Users size={14} /> {course.organisation}
                   </span>
                 )}
               </div>
-
-              {progress >= 100 && (
-                <div className="flex items-center justify-center gap-2 mt-4 text-sm text-green-600">
-                  <CheckCircle2 size={16} />
-                  Course complete — generating certificate...
-                </div>
-              )}
             </div>
-          ) : (
-            /* ─── NOT STARTED / ENROLL STATE ─── */
-            <div>
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">
-                {enrollment ? "Ready to Start" : "Enroll in this Course"}
-              </h3>
 
-              {!enrollment ? (
-                <button
-                  onClick={handleEnroll}
-                  disabled={enrolling || !session}
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  {enrolling ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <BookOpen size={16} />
-                  )}
-                  {enrolling ? "Enrolling..." : "Enroll Now"}
-                </button>
-              ) : (
-                <>
-                  <p className="text-xs text-slate-500 mb-4">
-                    Once you start, the course will auto-complete based on its
-                    duration ({course.duration_hours || "varies"} hours).
-                  </p>
-                  <button
-                    onClick={handleStart}
-                    disabled={starting}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-cyan-500 text-white text-sm font-semibold hover:from-primary-600 hover:to-cyan-600 transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {starting ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <Play size={16} />
+            {/* Action Card */}
+            <div className="w-full md:w-72 shrink-0">
+              <ClayCard className="p-5">
+                {completed || enrollment?.status === "completed" ? (
+                  <div className="text-center">
+                    <CheckCircle2 size={36} className="mx-auto text-green-500 mb-2" />
+                    <p className="text-sm font-semibold text-slate-800">Completed</p>
+                    <div className="flex items-center justify-center gap-1 text-xs text-amber-600 mt-2">
+                      <Award size={14} /> Certificate earned
+                    </div>
+                  </div>
+                ) : enrollment?.status === "in_progress" ? (
+                  <div>
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className="text-slate-600">Progress</span>
+                      <span className="font-mono text-primary-600">{progress}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-500 to-cyan-500 rounded-full transition-all duration-1000"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    {timeLeft > 0 && progress < 100 && (
+                      <p className="text-xs text-slate-500 text-center">
+                        ~{formatTime(timeLeft)} remaining
+                      </p>
                     )}
-                    {starting ? "Starting..." : "Start Course"}
-                  </button>
-                </>
-              )}
-
-              {!session && (
-                <p className="text-xs text-slate-400 text-center mt-3">
-                  <button
-                    onClick={() => router.push("/login")}
-                    className="text-primary-600 hover:underline cursor-pointer"
-                  >
-                    Sign in
-                  </button>{" "}
-                  to enroll in courses
-                </p>
-              )}
+                    {progress >= 100 && (
+                      <p className="text-xs text-green-600 text-center">Finalizing...</p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {!enrollment ? (
+                      <button
+                        onClick={handleEnroll}
+                        disabled={enrolling || !session}
+                        className="w-full py-2.5 rounded-xl bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {enrolling ? <Loader2 size={14} className="animate-spin" /> : <BookOpen size={14} />}
+                        {enrolling ? "Enrolling..." : "Enroll Now"}
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleStart}
+                        disabled={starting}
+                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-cyan-500 text-white text-sm font-semibold hover:from-primary-600 hover:to-cyan-600 transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        {starting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                        {starting ? "Starting..." : "Start Course"}
+                      </button>
+                    )}
+                    {!session && (
+                      <p className="text-xs text-slate-400 text-center">
+                        <button onClick={() => router.push("/login")} className="text-primary-600 hover:underline cursor-pointer">Sign in</button> to enroll
+                      </p>
+                    )}
+                  </div>
+                )}
+              </ClayCard>
             </div>
-          )}
-        </ClayCard>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs + Content */}
+      <div className="max-w-5xl mx-auto px-4 py-6">
+        {/* Tab Bar */}
+        <div className="flex gap-1 border-b border-slate-200 mb-6 overflow-x-auto">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+                activeTab === tab.id
+                  ? "border-primary-500 text-primary-600"
+                  : "border-transparent text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            <ClayCard className="p-6">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">About this course</h3>
+              <p className="text-sm text-slate-600 leading-relaxed">{course.description}</p>
+            </ClayCard>
+
+            {course.instructions && (
+              <ClayCard className="p-6">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">Learning Objectives</h3>
+                <div className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">
+                  {course.instructions.split('•').filter(Boolean).map((obj, i) => (
+                    <div key={i} className="flex gap-2 mb-2">
+                      <CheckCircle2 size={14} className="text-green-500 mt-0.5 shrink-0" />
+                      <span>{obj.trim()}</span>
+                    </div>
+                  ))}
+                </div>
+              </ClayCard>
+            )}
+
+            {course.keywords?.length > 0 && (
+              <ClayCard className="p-6">
+                <h3 className="text-sm font-semibold text-slate-700 mb-3">Topics Covered</h3>
+                <div className="flex flex-wrap gap-2">
+                  {course.keywords.map((kw, i) => (
+                    <span key={i} className="text-xs bg-primary-50 text-primary-700 px-3 py-1 rounded-xl border border-primary-100">
+                      <Tag size={10} className="inline mr-1" />
+                      {kw}
+                    </span>
+                  ))}
+                </div>
+              </ClayCard>
+            )}
+
+            {course.external_url && (
+              <a
+                href={course.external_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm text-primary-600 hover:text-primary-700"
+              >
+                <ExternalLink size={14} />
+                View on iGOT Karmayogi
+              </a>
+            )}
+          </div>
+        )}
+
+        {activeTab === "modules" && (
+          <div className="space-y-3">
+            {course.modules?.length === 0 ? (
+              <ClayCard className="p-12 text-center">
+                <Video size={36} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-sm text-slate-500">Module details loading from iGOT...</p>
+              </ClayCard>
+            ) : (
+              course.modules?.map((mod, i) => (
+                <ClayCard key={mod.id} className="p-4 flex items-center gap-4 hover:shadow-md transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-100 to-cyan-100 flex items-center justify-center shrink-0">
+                    {mod.type === "video" ? (
+                      <Video size={18} className="text-primary-500" />
+                    ) : mod.type === "assessment" ? (
+                      <ClipboardCheck size={18} className="text-amber-500" />
+                    ) : (
+                      <BookOpen size={18} className="text-primary-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700 truncate">{mod.name}</p>
+                    <p className="text-xs text-slate-400 capitalize">{mod.type}</p>
+                  </div>
+                  <span className="text-xs text-slate-400">#{i + 1}</span>
+                </ClayCard>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "materials" && (
+          <div className="space-y-3">
+            {resources.length === 0 ? (
+              <ClayCard className="p-12 text-center">
+                <BookOpen size={36} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-sm text-slate-500">Study materials are available within the iGOT course modules.</p>
+                {course.external_url && (
+                  <a
+                    href={course.external_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 mt-3 text-sm text-primary-600 hover:text-primary-700"
+                  >
+                    <ExternalLink size={14} />
+                    Open on iGOT
+                  </a>
+                )}
+              </ClayCard>
+            ) : (
+              resources.map((r, i) => (
+                <ClayCard key={r.id} className="p-4 flex items-center gap-4 hover:shadow-md transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                    <FileText size={18} className="text-slate-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700 truncate">{r.name}</p>
+                    <p className="text-xs text-slate-400">Resource</p>
+                  </div>
+                </ClayCard>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "assessments" && (
+          <div className="space-y-3">
+            {assessments.length === 0 ? (
+              <ClayCard className="p-12 text-center">
+                <ClipboardCheck size={36} className="mx-auto text-slate-300 mb-3" />
+                <p className="text-sm text-slate-500 mb-2">
+                  No separate assessments tab — quizzes are embedded within modules on iGOT.
+                </p>
+                <p className="text-xs text-slate-400">
+                  After completing this course, take the SkillUp assessment to test your knowledge.
+                </p>
+                <button
+                  onClick={() => router.push("/assessment")}
+                  className="mt-4 px-4 py-2 rounded-xl bg-primary-500 text-white text-sm font-medium hover:bg-primary-600 transition-colors cursor-pointer"
+                >
+                  Take SkillUp Assessment
+                </button>
+              </ClayCard>
+            ) : (
+              assessments.map((a, i) => (
+                <ClayCard key={a.id} className="p-4 flex items-center gap-4 hover:shadow-md transition-all">
+                  <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center shrink-0">
+                    <ClipboardCheck size={18} className="text-amber-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-700 truncate">{a.name}</p>
+                    <p className="text-xs text-slate-400">Quiz / Assessment</p>
+                  </div>
+                </ClayCard>
+              ))
+            )}
+          </div>
+        )}
+
+        {activeTab === "tasks" && (
+          <ClayCard className="p-12 text-center">
+            <ListChecks size={36} className="mx-auto text-slate-300 mb-3" />
+            <p className="text-sm text-slate-500 mb-2">
+              Tasks and assignments will be available after course completion.
+            </p>
+            <p className="text-xs text-slate-400">
+              Complete the course and assessment to unlock practical tasks.
+            </p>
+          </ClayCard>
+        )}
       </div>
     </div>
   );
