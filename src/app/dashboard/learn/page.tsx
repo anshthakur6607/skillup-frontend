@@ -6,6 +6,7 @@
  * Inspired by iGOT Karmayogi Learn Hub.
  */
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ClayCard } from "@/components/ui";
 import { motion } from "framer-motion";
@@ -43,6 +44,7 @@ const fadeUp = {
 };
 
 export default function LearnHubPage() {
+  const router = useRouter();
   const { session } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [filtered, setFiltered] = useState<Course[]>([]);
@@ -54,6 +56,23 @@ export default function LearnHubPage() {
     if (!session) return;
     const fetchCourses = async () => {
       try {
+        // Try the new courses API first (service-role, bypasses RLS)
+        const res = await fetch("/api/courses?limit=50");
+        if (res.ok) {
+          const data = await res.json();
+          if (data.data) {
+            setCourses(data.data);
+            setFiltered(data.data);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // fallback below
+      }
+
+      try {
+        // Fallback to dashboard API
         const res = await fetch("/api/dashboard/courses", {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
@@ -160,7 +179,8 @@ export default function LearnHubPage() {
         >
           {filtered.map((course) => (
             <motion.div key={course.id} variants={fadeUp}>
-              <ClayCard className="p-5 h-full flex flex-col group cursor-pointer">
+              <div onClick={() => router.push(`/courses/${course.id}`)} className="cursor-pointer">
+              <ClayCard className="p-5 h-full flex flex-col group hover:shadow-lg transition-all">
                 <div className="flex items-start gap-3 mb-3">
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary-100 to-cyan-100 flex items-center justify-center shrink-0 group-hover:from-primary-200 group-hover:to-cyan-200 transition-colors">
                     <BookOpen size={20} className="text-primary-500" />
@@ -193,6 +213,7 @@ export default function LearnHubPage() {
                   </button>
                 </div>
               </ClayCard>
+              </div>
             </motion.div>
           ))}
         </motion.div>

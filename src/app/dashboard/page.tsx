@@ -14,7 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { supabase } from "@/lib/supabaseClient";
 import { ClayCard } from "@/components/ui";
-import { getTPACSessions, authGet } from "@/lib/api";
+import { getTPACSessions } from "@/lib/api";
 import {
   User,
   BookOpen,
@@ -24,7 +24,6 @@ import {
   ExternalLink,
   Loader2,
   ArrowRight,
-  RefreshCw,
 } from "lucide-react";
 
 interface Profile {
@@ -96,19 +95,25 @@ function DashboardContent() {
       }
       setProfile(prof);
 
-      // Fetch iGOT courses
-      const coursesResp = await authGet("/api/lookups/central_ministries", token);
+      // Fetch courses from backend API
+      try {
+        const coursesResp = await fetch("/api/courses?limit=10");
+        if (coursesResp.ok) {
+          const coursesData = await coursesResp.json();
+          if (coursesData.data) setIgotCourses(coursesData.data as IGOTCourse[]);
+        }
+      } catch {
+        // Fallback: try Supabase directly
+        const { data: courses } = await supabase
+          .from("courses")
+          .select("*")
+          .eq("is_active", true)
+          .limit(10);
+        if (courses) setIgotCourses(courses as IGOTCourse[]);
+      }
+
       // Fetch TPAC sessions
       const tpacResp = await getTPACSessions(token);
-
-      // Fetch courses from our DB
-      const { data: courses } = await supabase
-        .from("courses")
-        .select("*")
-        .eq("is_active", true)
-        .limit(10);
-
-      if (courses) setIgotCourses(courses as IGOTCourse[]);
       if (tpacResp.data && typeof tpacResp.data === "object" && "data" in tpacResp.data) {
         setTpacSessions((tpacResp.data as { data: TPACSession[] }).data || []);
       }
@@ -188,12 +193,12 @@ function DashboardContent() {
                 <ActionLink
                   icon={<BarChart3 size={16} />}
                   label="Take Skill Assessment"
-                  href="#"
+                  href="/assessment"
                 />
                 <ActionLink
                   icon={<BookOpen size={16} />}
                   label="Browse Courses"
-                  href="#"
+                  href="/courses"
                 />
                 <ActionLink
                   icon={<Calendar size={16} />}
@@ -213,9 +218,9 @@ function DashboardContent() {
                   <BookOpen size={18} className="text-primary-600" />
                   <h3 className="font-semibold text-slate-800">iGOT Karmayogi Courses</h3>
                 </div>
-                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
-                  {igotCourses.length} available
-                </span>
+                <a href="/courses" className="text-xs text-primary-600 hover:text-primary-700 font-medium">
+                  View All →
+                </a>
               </div>
               {igotCourses.length === 0 ? (
                 <p className="text-slate-400 text-sm">No courses synced yet.</p>
@@ -224,7 +229,8 @@ function DashboardContent() {
                   {igotCourses.slice(0, 5).map((course) => (
                     <div
                       key={course.id}
-                      className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary-100 transition-colors"
+                      className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary-100 hover:bg-primary-50/30 transition-colors cursor-pointer"
+                      onClick={() => router.push(`/courses/${course.id}`)}
                     >
                       <div className="shrink-0 w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
                         <BookOpen size={14} className="text-primary-600" />
