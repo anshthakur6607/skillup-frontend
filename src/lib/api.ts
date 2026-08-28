@@ -30,3 +30,36 @@ export async function checkBackendHealth(): Promise<ApiResponse<HealthResponse> 
 export async function authGet(path: string, token: string): Promise<ApiResponse<unknown>> {
   return request<unknown>(path, { headers: { Authorization: "Bearer " + token } });
 }
+
+export async function authPost(path: string, token: string, body?: unknown): Promise<ApiResponse<unknown>> {
+  return request<unknown>(path, {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+export async function authPatch(path: string, token: string, body: unknown): Promise<ApiResponse<unknown>> {
+  return request<unknown>(path, {
+    method: 'PATCH',
+    headers: { Authorization: 'Bearer ' + token },
+    body: JSON.stringify(body),
+  });
+}
+
+// Integration endpoints
+export async function getTPACSessions(token: string): Promise<ApiResponse<unknown>> {
+  return authGet('/api/integrations/tpac', token);
+}
+
+export async function getSyncStatus(token: string): Promise<ApiResponse<unknown>> {
+  return authGet('/api/integrations/status', token);
+}
+
+export async function getSyncLogs(token: string): Promise<ApiResponse<unknown>> {
+  return authGet('/api/integrations/logs', token);
+}
+
+export async function triggerSync(token: string): Promise<ApiResponse<unknown>> {
+  return authPost('/api/integrations/sync', token);
+}
