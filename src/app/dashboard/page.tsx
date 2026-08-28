@@ -95,21 +95,51 @@ function DashboardContent() {
       }
       setProfile(prof);
 
-      // Fetch courses from backend API
+      // Fetch courses — try backend API, then iGOT directly
       try {
         const coursesResp = await fetch("/api/courses?limit=10");
         if (coursesResp.ok) {
           const coursesData = await coursesResp.json();
-          if (coursesData.data) setIgotCourses(coursesData.data as IGOTCourse[]);
+          if (coursesData.data && coursesData.data.length > 0) {
+            setIgotCourses(coursesData.data as IGOTCourse[]);
+          } else {
+            throw new Error('empty');
+          }
+        } else {
+          throw new Error('failed');
         }
       } catch {
-        // Fallback: try Supabase directly
-        const { data: courses } = await supabase
-          .from("courses")
-          .select("*")
-          .eq("is_active", true)
-          .limit(10);
-        if (courses) setIgotCourses(courses as IGOTCourse[]);
+        // Fallback: fetch directly from iGOT API
+        try {
+          const IGOT_IDS = [
+            'do_113923174474121216195', 'do_1141533540853432321675',
+            'do_1143166853070028801812', 'do_1143052789530787841562',
+            'do_113569878939262976132',
+          ];
+          const results = await Promise.allSettled(
+            IGOT_IDS.slice(0, 5).map(async (id) => {
+              const r = await fetch(`https://igotkarmayogi.gov.in/api/content/v1/read/${id}`, { signal: AbortSignal.timeout(8000) });
+              if (!r.ok) return null;
+              const d = await r.json();
+              const c = d?.result?.content;
+              if (!c) return null;
+              return {
+                id: c.identifier || id,
+                title: c.name,
+                description: (c.description || '').replace(/<[^>]*>/g, '').substring(0, 200),
+                source: 'igot',
+                duration_hours: Math.round((parseInt(c.duration || '0') / 3600) * 10) / 10 || 0.5,
+                external_url: `https://portal.igotkarmayogi.gov.in/public/toc/${c.identifier || id}/overview`,
+              };
+            })
+          );
+          const fetched = results
+            .filter((r): r is PromiseFulfilledResult<IGOTCourse> => r.status === 'fulfilled' && r.value !== null)
+            .map((r) => r.value);
+          if (fetched.length > 0) setIgotCourses(fetched);
+        } catch {
+          // silent
+        }
       }
 
       // Fetch TPAC sessions
