@@ -708,7 +708,6 @@ export default function ProfileSetupPage() {
                   <p className="text-xs text-slate-500">
                     Your profile will be synced with iGOT so your course completions
                     and training records are automatically reflected in your skill profile.
-                    NSSTA TPAC training sessions will also appear in your recommendations.
                   </p>
                 </div>
 
