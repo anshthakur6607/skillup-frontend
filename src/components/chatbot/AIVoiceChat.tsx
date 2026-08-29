@@ -1,30 +1,17 @@
 "use client";
 /**
- * AIVoiceChat — real-time voice conversation with Gemini AI.
+ * AIVoiceChat — voice conversation with AI using Web Speech API.
  *
- * Uses Gemini Multimodal Live API via WebRTC for low-latency voice chat.
- * Falls back to text-based chat if WebRTC is unavailable.
- *
- * Features:
- * - Start/stop voice chat with mic button
- * - Language selector (English, Hindi, etc.)
+ * - Voice input: Web Speech API (SpeechRecognition)
+ * - AI responses: Backend /api/ai/chat proxy (Gemini/Sarvam server-side)
+ * - Voice output: Web Speech API (SpeechSynthesis)
+ * - Language selector for voice recognition and response language
  * - Course-aware: sends course context when opened from course page
- * - Visual feedback: listening, thinking, speaking states
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLanguage, LANGUAGES } from "@/context/LanguageContext";
-import {
-  Mic,
-  MicOff,
-  Phone,
-  PhoneOff,
-  Globe,
-  Loader2,
-  Volume2,
-  VolumeX,
-  ChevronDown,
-} from "lucide-react";
+import { Mic, MicOff, PhoneOff, Globe, Volume2, VolumeX, ChevronDown, Bot, User, Loader2 } from "lucide-react";
 
 interface AIVoiceChatProps {
   courseTitle?: string;
@@ -36,6 +23,11 @@ interface AIVoiceChatProps {
 
 type VoiceState = "idle" | "connecting" | "listening" | "thinking" | "speaking" | "error";
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  text: string;
+}
+
 export function AIVoiceChat({
   courseTitle,
   courseDescription,
@@ -46,195 +38,157 @@ export function AIVoiceChat({
   const { language } = useLanguage();
   const [isOpen, setIsOpen] = useState(false);
   const [state, setState] = useState<VoiceState>("idle");
-  const [transcript, setTranscript] = useState("");
-  const [response, setResponse] = useState("");
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [selectedLang, setSelectedLang] = useState(language);
   const [langOpen, setLangOpen] = useState(false);
   const [error, setError] = useState("");
-  const [muted, setMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+  const [inputText, setInputText] = useState("");
 
-  const peerConnection = useRef<RTCPeerConnection | null>(null);
-  const dataChannel = useRef<RTCDataChannel | null>(null);
-  const audioElement = useRef<HTMLAudioElement | null>(null);
-  const mediaStream = useRef<MediaStream | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
-  // Build course context for the AI
   const courseContext = courseTitle
-    ? `COURSE: ${courseTitle}
-DESCRIPTION: ${courseDescription || "N/A"}
-DURATION: ${courseDuration || "unknown"} hours
-DIFFICULTY: ${courseDifficulty || "Beginner"}
-MODULES: ${courseModules?.map((m) => m.name).join(", ") || "Not available"}`
+    ? `COURSE: ${courseTitle}\nDESCRIPTION: ${courseDescription || "N/A"}\nDURATION: ${courseDuration || "unknown"} hours\nDIFFICULTY: ${courseDifficulty || "Beginner"}\nMODULES: ${courseModules?.map((m) => m.name).join(", ") || "Not available"}`
     : "General assistant — no specific course context.";
 
-  const systemInstruction = `You are an AI voice assistant for SkillUp, a government training platform.
-You help officials learn about courses, answer questions about content, and guide them through their learning journey.
-Be helpful, concise, and professional. Keep responses under 3 sentences for voice.
-${courseContext}`;
-
   const languageNames: Record<string, string> = {
-    en: "English",
-    hi: "Hindi",
-    bn: "Bengali",
-    ta: "Tamil",
-    te: "Telugu",
-    mr: "Marathi",
-    gu: "Gujarati",
-    kn: "Kannada",
-    ml: "Malayalam",
-    pa: "Punjabi",
+    en: "English", hi: "Hindi", bn: "Bengali", ta: "Tamil", te: "Telugu",
+    mr: "Marathi", gu: "Gujarati", kn: "Kannada", ml: "Malayalam", pa: "Punjabi",
   };
 
-  const startVoiceChat = useCallback(async () => {
+  const langMap: Record<string, string> = {
+    en: "en-US", hi: "hi-IN", bn: "bn-IN", ta: "ta-IN", te: "te-IN",
+    mr: "mr-IN", gu: "gu-IN", kn: "kn-IN", ml: "ml-IN", pa: "pa-IN",
+  };
+
+  // Send message to backend AI
+  const sendToAI = useCallback(async (text: string): Promise<string> => {
+    try {
+      const resp = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, context: courseContext, language: selectedLang }),
+      });
+      if (!resp.ok) throw new Error("AI request failed");
+      const data = await resp.json();
+      return data?.data?.response || "I couldn't generate a response. Please try again.";
+    } catch {
+      return "AI service is temporarily unavailable. Please try again later.";
+    }
+  }, [courseContext, selectedLang]);
+
+  // Speak text using Web Speech Synthesis
+  const speak = useCallback((text: string) => {
+    if (isMuted || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = langMap[selectedLang] || "en-US";
+    utterance.rate = 0.9;
+    utterance.pitch = 1;
+    utterance.onend = () => setState("listening");
+    window.speechSynthesis.speak(utterance);
+  }, [selectedLang, isMuted]);
+
+  // Start voice chat
+  const startChat = useCallback(async () => {
     setState("connecting");
     setError("");
 
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
-      if (!apiKey) {
-        setError("AI voice chat requires a Gemini API key. Add NEXT_PUBLIC_GEMINI_API_KEY to your .env");
-        setState("error");
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const w = window as any;
+      const SpeechRecognitionAPI = w.SpeechRecognition || w.webkitSpeechRecognition;
+
+      if (!SpeechRecognitionAPI) {
+        setError("Voice requires Chrome. Use the text input below instead.");
+        setState("idle");
         return;
       }
 
-      // Get user microphone
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStream.current = stream;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const recognition = new (SpeechRecognitionAPI as any)();
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      recognition.lang = langMap[selectedLang] || "en-US";
 
-      // Create audio element for AI responses
-      if (!audioElement.current) {
-        audioElement.current = new Audio();
-        audioElement.current.autoplay = true;
-      }
+      recognition.onresult = async (event: { results: { transcript: string }[][] }) => {
+        const transcript = event.results[event.results.length - 1][0].transcript;
+        setState("thinking");
 
-      // Set up WebRTC peer connection to Gemini
-      const pc = new RTCPeerConnection({
-        iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
-      });
-      peerConnection.current = pc;
+        setMessages((prev) => [...prev, { role: "user", text: transcript }]);
+        const response = await sendToAI(transcript);
+        setMessages((prev) => [...prev, { role: "assistant", text: response }]);
+        setState("speaking");
+        speak(response);
+      };
 
-      // Add audio tracks
-      stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+      recognition.onerror = () => {
+        setState("listening"); // restart listening
+      };
 
-      // Create offer
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      // Send offer to Gemini Live API
-      const langCode = selectedLang === "hi" ? "hi-IN" : selectedLang === "en" ? "en-US" : `${selectedLang}-IN`;
-      const model = "gemini-2.0-flash-live-001";
-
-      const sdpResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:connect?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/sdp" },
-          body: offer.sdp,
-        }
-      );
-
-      if (!sdpResponse.ok) {
-        throw new Error(`Gemini Live API returned ${sdpResponse.status}`);
-      }
-
-      const answerSdp = await sdpResponse.text();
-      await pc.setRemoteDescription({ type: "answer", sdp: answerSdp });
-
-      // Handle incoming audio
-      pc.ontrack = (event) => {
-        if (audioElement.current) {
-          audioElement.current.srcObject = event.streams[0];
+      recognition.onend = () => {
+        // Auto-restart if still in listening mode
+        if (state === "listening" || state === "connecting") {
+          try { recognition.start(); } catch { /* silent */ }
         }
       };
 
-      // Set up data channel for text messages
-      const dc = pc.createDataChannel("text");
-      dataChannel.current = dc;
+      recognitionRef.current = recognition;
+      recognition.start();
+      setState("listening");
 
-      dc.onopen = () => {
-        setState("listening");
-        // Send configuration
-        dc.send(
-          JSON.stringify({
-            setup: {
-              system_instruction: systemInstruction,
-              language: langCode,
-            },
-          })
-        );
-      };
-
-      dc.onmessage = (event) => {
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.transcript) setTranscript(msg.transcript);
-          if (msg.response) {
-            setResponse(msg.response);
-            setState("speaking");
-          }
-        } catch {
-          // raw text message
-          setResponse(event.data);
-        }
-      };
-
-      dc.onclose = () => {
-        setState("idle");
-      };
-
-      // Handle connection errors
-      pc.onconnectionstatechange = () => {
-        if (pc.connectionState === "failed" || pc.connectionState === "disconnected") {
-          setState("error");
-          setError("Voice connection lost. Please try again.");
-          cleanup();
-        }
-      };
+      setMessages([{
+        role: "assistant",
+        text: courseTitle
+          ? `Hello! I'm your AI voice assistant for "${courseTitle}". Ask me anything about this course!`
+          : "Hello! I'm your AI voice assistant. How can I help you today?",
+      }]);
     } catch (err) {
-      console.error("Voice chat error:", err);
       setError(err instanceof Error ? err.message : "Failed to start voice chat");
       setState("error");
-      cleanup();
     }
-  }, [selectedLang, systemInstruction]);
+  }, [selectedLang, courseTitle, sendToAI, speak, state]);
 
-  const stopVoiceChat = useCallback(() => {
-    cleanup();
+  // Stop voice chat
+  const stopChat = useCallback(() => {
+    if (recognitionRef.current) {
+      recognitionRef.current.abort();
+      recognitionRef.current = null;
+    }
+    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
     setState("idle");
-    setTranscript("");
-    setResponse("");
+    setMessages([]);
+    setInputText("");
   }, []);
 
-  const cleanup = useCallback(() => {
-    if (dataChannel.current) {
-      dataChannel.current.close();
-      dataChannel.current = null;
-    }
-    if (peerConnection.current) {
-      peerConnection.current.close();
-      peerConnection.current = null;
-    }
-    if (mediaStream.current) {
-      mediaStream.current.getTracks().forEach((t) => t.stop());
-      mediaStream.current = null;
-    }
-    if (audioElement.current) {
-      audioElement.current.srcObject = null;
-    }
-  }, []);
+  // Send text message (fallback for non-Chrome)
+  const sendText = useCallback(async () => {
+    if (!inputText.trim()) return;
+    const text = inputText.trim();
+    setInputText("");
+    setState("thinking");
+    setMessages((prev) => [...prev, { role: "user", text }]);
+
+    const response = await sendToAI(text);
+    setMessages((prev) => [...prev, { role: "assistant", text: response }]);
+    setState("listening");
+    speak(response);
+  }, [inputText, sendToAI, speak]);
 
   useEffect(() => {
-    return () => cleanup();
-  }, [cleanup]);
+    return () => {
+      if (recognitionRef.current) recognitionRef.current.abort();
+      if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+    };
+  }, []);
 
   return (
     <>
-      {/* Floating Voice Button */}
+      {/* Floating Button */}
       <button
         onClick={() => {
-          if (isOpen) {
-            stopVoiceChat();
-          }
+          if (isOpen) stopChat();
           setIsOpen(!isOpen);
         }}
         className="fixed bottom-6 right-20 z-50 w-14 h-14 bg-primary-500 text-white shadow-lg hover:bg-primary-600 transition-all cursor-pointer flex items-center justify-center"
@@ -247,11 +201,11 @@ ${courseContext}`;
       {/* Voice Chat Panel */}
       {isOpen && (
         <div
-          className="fixed bottom-24 right-6 z-50 w-80 bg-white border border-slate-200 shadow-xl"
-          style={{ borderRadius: "8px" }}
+          className="fixed bottom-24 right-6 z-50 w-80 bg-white border border-slate-200 shadow-xl flex flex-col"
+          style={{ borderRadius: "8px", maxHeight: "500px" }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 shrink-0">
             <div className="flex items-center gap-2">
               <Volume2 size={16} className="text-primary-500" />
               <span className="text-sm font-semibold text-slate-800">AI Voice Chat</span>
@@ -274,10 +228,7 @@ ${courseContext}`;
                   {LANGUAGES.slice(0, 6).map((lang) => (
                     <button
                       key={lang.code}
-                      onClick={() => {
-                        setSelectedLang(lang.code);
-                        setLangOpen(false);
-                      }}
+                      onClick={() => { setSelectedLang(lang.code); setLangOpen(false); }}
                       className={`w-full text-left px-2.5 py-1.5 text-[10px] hover:bg-slate-50 cursor-pointer ${
                         selectedLang === lang.code ? "bg-primary-50 text-primary-600 font-semibold" : "text-slate-600"
                       }`}
@@ -290,19 +241,19 @@ ${courseContext}`;
             </div>
           </div>
 
-          {/* Status */}
-          <div className="px-4 py-6 text-center">
-            {state === "idle" && (
-              <div>
-                <div className="w-16 h-16 bg-primary-50 flex items-center justify-center mx-auto mb-3" style={{ borderRadius: "50%" }}>
-                  <Mic size={24} className="text-primary-500" />
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-[200px]">
+            {state === "idle" && messages.length === 0 && (
+              <div className="text-center py-8">
+                <div className="w-14 h-14 bg-primary-50 flex items-center justify-center mx-auto mb-3" style={{ borderRadius: "50%" }}>
+                  <Mic size={22} className="text-primary-500" />
                 </div>
-                <p className="text-xs text-slate-500 mb-4">
+                <p className="text-xs text-slate-500 mb-3">
                   {courseTitle ? `Ask about "${courseTitle}"` : "Start a voice conversation"}
                 </p>
                 <button
-                  onClick={startVoiceChat}
-                  className="px-6 py-2.5 bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 cursor-pointer"
+                  onClick={startChat}
+                  className="px-5 py-2 bg-primary-500 text-white text-sm font-semibold hover:bg-primary-600 cursor-pointer"
                   style={{ borderRadius: "4px" }}
                 >
                   Start Voice Chat
@@ -311,85 +262,99 @@ ${courseContext}`;
             )}
 
             {state === "connecting" && (
-              <div>
-                <Loader2 size={32} className="animate-spin text-primary-500 mx-auto mb-3" />
-                <p className="text-xs text-slate-500">Connecting to AI...</p>
+              <div className="text-center py-8">
+                <Loader2 size={28} className="animate-spin text-primary-500 mx-auto mb-3" />
+                <p className="text-xs text-slate-500">Starting voice chat...</p>
               </div>
             )}
 
-            {(state === "listening" || state === "thinking" || state === "speaking") && (
-              <div>
-                {/* Animated mic indicator */}
+            {messages.map((msg, i) => (
+              <div key={i} className={`flex gap-2 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                {msg.role === "assistant" && (
+                  <div className="w-6 h-6 bg-primary-100 flex items-center justify-center shrink-0" style={{ borderRadius: "50%" }}>
+                    <Bot size={12} className="text-primary-600" />
+                  </div>
+                )}
                 <div
-                  className={`w-16 h-16 mx-auto mb-3 flex items-center justify-center transition-colors ${
-                    state === "listening" ? "bg-red-50" : state === "thinking" ? "bg-amber-50" : "bg-green-50"
+                  className={`max-w-[80%] px-3 py-2 text-xs leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-primary-500 text-white"
+                      : "bg-slate-100 text-slate-700"
                   }`}
-                  style={{ borderRadius: "50%" }}
-                >
-                  {state === "listening" ? (
-                    <Mic size={24} className="text-red-500 animate-pulse" />
-                  ) : state === "thinking" ? (
-                    <Loader2 size={24} className="animate-spin text-amber-500" />
-                  ) : (
-                    <Volume2 size={24} className="text-green-500" />
-                  )}
-                </div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider mb-2">
-                  {state === "listening" ? "Listening..." : state === "thinking" ? "Thinking..." : "Speaking..."}
-                </p>
-
-                {/* Transcript */}
-                {transcript && (
-                  <div className="px-3 py-2 bg-slate-50 border border-slate-100 mb-2 text-xs text-slate-600 text-left" style={{ borderRadius: "4px" }}>
-                    <span className="text-[10px] text-slate-400 font-medium">You:</span> {transcript}
-                  </div>
-                )}
-
-                {/* Response */}
-                {response && (
-                  <div className="px-3 py-2 bg-primary-50 border border-primary-100 text-xs text-slate-700 text-left" style={{ borderRadius: "4px" }}>
-                    <span className="text-[10px] text-primary-500 font-medium">AI:</span> {response}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {state === "error" && (
-              <div>
-                <div className="w-16 h-16 bg-red-50 flex items-center justify-center mx-auto mb-3" style={{ borderRadius: "50%" }}>
-                  <MicOff size={24} className="text-red-400" />
-                </div>
-                <p className="text-xs text-red-500 mb-3">{error}</p>
-                <button
-                  onClick={() => { setState("idle"); setError(""); }}
-                  className="px-4 py-2 text-xs font-medium text-primary-500 border border-primary-200 hover:bg-primary-50 cursor-pointer"
                   style={{ borderRadius: "4px" }}
                 >
-                  Try Again
-                </button>
+                  {msg.text}
+                </div>
+                {msg.role === "user" && (
+                  <div className="w-6 h-6 bg-slate-200 flex items-center justify-center shrink-0" style={{ borderRadius: "50%" }}>
+                    <User size={12} className="text-slate-500" />
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {state === "thinking" && (
+              <div className="flex gap-2 justify-start">
+                <div className="w-6 h-6 bg-primary-100 flex items-center justify-center shrink-0" style={{ borderRadius: "50%" }}>
+                  <Loader2 size={12} className="animate-spin text-primary-600" />
+                </div>
+                <div className="bg-slate-100 px-3 py-2" style={{ borderRadius: "4px" }}>
+                  <p className="text-xs text-slate-400">Thinking...</p>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Footer controls */}
-          {state !== "idle" && state !== "error" && (
-            <div className="flex items-center justify-center gap-3 px-4 py-3 border-t border-slate-200">
-              <button
-                onClick={() => setMuted(!muted)}
-                className="p-2 text-slate-400 hover:text-slate-600 cursor-pointer bg-transparent border-none"
-                title={muted ? "Unmute" : "Mute"}
-              >
-                {muted ? <VolumeX size={16} /> : <Volume2 size={16} />}
-              </button>
-              <button
-                onClick={stopVoiceChat}
-                className="px-4 py-2 bg-red-500 text-white text-xs font-semibold hover:bg-red-600 cursor-pointer"
-                style={{ borderRadius: "4px" }}
-              >
-                End Call
-              </button>
+          {/* Status indicator */}
+          {state === "listening" && (
+            <div className="px-4 py-2 border-t border-slate-100 text-center">
+              <p className="text-[10px] text-red-500 font-medium animate-pulse">
+                Listening... speak now
+              </p>
             </div>
           )}
+          {state === "speaking" && (
+            <div className="px-4 py-2 border-t border-slate-100 text-center">
+              <p className="text-[10px] text-green-500 font-medium">
+                AI is speaking...
+              </p>
+            </div>
+          )}
+
+          {/* Text input fallback */}
+          <div className="border-t border-slate-200 px-3 py-2 shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 cursor-pointer bg-transparent border-none"
+              >
+                {isMuted ? <VolumeX size={14} /> : <Volume2 size={14} />}
+              </button>
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendText()}
+                placeholder="Type a message..."
+                className="flex-1 px-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 focus:outline-none"
+                style={{ borderRadius: "4px" }}
+              />
+              <button
+                onClick={() => { if (state === "idle") startChat(); else stopChat(); }}
+                className={`px-3 py-1.5 text-[10px] font-semibold cursor-pointer ${
+                  state === "idle"
+                    ? "bg-primary-500 text-white hover:bg-primary-600"
+                    : "bg-red-500 text-white hover:bg-red-600"
+                }`}
+                style={{ borderRadius: "4px" }}
+              >
+                {state === "idle" ? "Start" : "Stop"}
+              </button>
+            </div>
+            {error && (
+              <p className="text-[10px] text-red-500 mt-1">{error}</p>
+            )}
+          </div>
         </div>
       )}
     </>

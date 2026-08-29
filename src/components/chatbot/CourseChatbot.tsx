@@ -116,8 +116,7 @@ URL: https://portal.igotkarmayogi.gov.in/public/toc/${courseId}/overview
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  // Handle send message uses imported getAIResponse from @/lib/aiService
-    // Handle send message
+  // Handle send message
   async function handleSend() {
     const text = input.trim();
     if (!text || isTyping) return;
