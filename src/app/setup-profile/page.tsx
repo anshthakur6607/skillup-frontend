@@ -42,6 +42,85 @@ interface OItem {
   state?: string;
 }
 
+// Fallback data — used if API lookups return empty
+const FALLBACK_MINISTRIES = [
+  "Ministry of Agriculture and Farmers Welfare",
+  "Ministry of Chemicals and Fertilizers",
+  "Ministry of Civil Aviation",
+  "Ministry of Coal",
+  "Ministry of Commerce and Industry",
+  "Ministry of Communications",
+  "Ministry of Consumer Affairs, Food and Public Distribution",
+  "Ministry of Corporate Affairs",
+  "Ministry of Defence",
+  "Ministry of Earth Sciences",
+  "Ministry of Education",
+  "Ministry of Electronics and Information Technology",
+  "Ministry of Environment, Forest and Climate Change",
+  "Ministry of External Affairs",
+  "Ministry of Finance",
+  "Ministry of Health and Family Welfare",
+  "Ministry of Home Affairs",
+  "Ministry of Housing and Urban Affairs",
+  "Ministry of Jal Shakti",
+  "Ministry of Labour and Employment",
+  "Ministry of Law and Justice",
+  "Ministry of Micro, Small and Medium Enterprises",
+  "Ministry of New and Renewable Energy",
+  "Ministry of Panchayati Raj",
+  "Ministry of Personnel, Public Grievances and Pensions",
+  "Ministry of Petroleum and Natural Gas",
+  "Ministry of Planning",
+  "Ministry of Power",
+  "Ministry of Railways",
+  "Ministry of Road Transport and Highways",
+  "Ministry of Rural Development",
+  "Ministry of Science and Technology",
+  "Ministry of Social Justice and Empowerment",
+  "Ministry of Statistics and Programme Implementation",
+  "Ministry of Textiles",
+  "Ministry of Tribal Affairs",
+  "Ministry of Women and Child Development",
+  "NITI Aayog",
+  "Cabinet Secretariat",
+  "President's Secretariat",
+  "Prime Minister's Office",
+];
+
+const FALLBACK_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
+  "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand",
+  "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur",
+  "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Punjab",
+  "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura",
+  "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi", "Jammu and Kashmir", "Ladakh", "Lakshadweep", "Puducherry",
+];
+
+const FALLBACK_DESIGNATIONS = [
+  "Assistant Director", "Assistant Director General",
+  "Chief Statistical Officer", "Deputy Director",
+  "Deputy Director General", "Deputy Secretary",
+  "Director", "Director General",
+  "Director General (Level 14)", "Joint Secretary",
+  "Junior Statistical Officer", "Multi-Tasking Staff",
+  "Section Officer", "Senior Statistical Officer",
+  "Special Director", "Special Secretary",
+  "Statistical Officer", "Under Secretary",
+];
+
+const FALLBACK_ORGANISATIONS = [
+  "Central Statistical Office (CSO)", "National Statistical Office (NSO)",
+  "National Sample Survey Office (NSSO)", "Computer Centre (CC)",
+  "Data Processing Division (DPD)", "Ministry of Statistics and Programme Implementation",
+  "NITI Aayog", "Election Commission of India",
+  "Union Public Service Commission", "Central Board of Direct Taxes",
+  "Comptroller and Auditor General of India", "Reserve Bank of India",
+  "Securities and Exchange Board of India", "Insurance Regulatory and Development Authority",
+  "Telecom Regulatory Authority of India",
+];
+
 const EDUCATION_LEVELS = [
   { value: "high_school", label: "High School / Secondary" },
   { value: "diploma", label: "Diploma" },
@@ -139,9 +218,22 @@ export default function ProfileSetupPage() {
         fetch("/api/lookups/indian_states", { headers: h }).then((r) => r.json()),
         fetch("/api/lookups/designations", { headers: h }).then((r) => r.json()),
       ]);
-      if (m.data) setMinistries(m.data);
-      if (s.data) setStates(s.data);
-      if (d.data) setDesignations(d.data);
+      // Use API data if available, otherwise use fallbacks
+      setMinistries(
+        m.data && m.data.length > 0
+          ? m.data
+          : FALLBACK_MINISTRIES.map((name, i) => ({ id: `fm-${i}`, name }))
+      );
+      setStates(
+        s.data && s.data.length > 0
+          ? s.data
+          : FALLBACK_STATES.map((name, i) => ({ id: `fs-${i}`, name }))
+      );
+      setDesignations(
+        d.data && d.data.length > 0
+          ? d.data
+          : FALLBACK_DESIGNATIONS.map((name, i) => ({ id: `fd-${i}`, name }))
+      );
     } catch {
       /* silent — dropdowns will just be empty */
     }
@@ -166,9 +258,16 @@ export default function ProfileSetupPage() {
 
       // Fetch orgs under ministry
       fetch(`/api/lookups/organisations/filter?ministry=${encodeURIComponent(ministry)}`, { headers: h })
-        .then((r) => r.json())
-        .then((d) => { if (d.data) setOrgs(d.data); })
-        .catch(() => setOrgs([]));
+        .then((r) => r.json())      .then((d) => {
+        setOrgs(
+          d.data && d.data.length > 0
+            ? d.data
+            : FALLBACK_ORGANISATIONS.map((name, i) => ({ id: `fo-${i}`, name }))
+        );
+      })
+      .catch(() =>
+        setOrgs(FALLBACK_ORGANISATIONS.map((name, i) => ({ id: `fo-${i}`, name })))
+      );
     } else if (govLevel === "state" && state) {
       // Fetch departments under state
       fetch(`/api/lookups/departments/filter?state=${encodeURIComponent(state)}`, { headers: h })
@@ -179,11 +278,19 @@ export default function ProfileSetupPage() {
       // Fetch orgs under state
       fetch(`/api/lookups/organisations/filter?state=${encodeURIComponent(state)}`, { headers: h })
         .then((r) => r.json())
-        .then((d) => { if (d.data) setOrgs(d.data); })
-        .catch(() => setOrgs([]));
+        .then((d) => {
+          setOrgs(
+            d.data && d.data.length > 0
+              ? d.data
+              : FALLBACK_ORGANISATIONS.map((name, i) => ({ id: `fo-${i}`, name }))
+          );
+        })
+        .catch(() =>
+          setOrgs(FALLBACK_ORGANISATIONS.map((name, i) => ({ id: `fo-${i}`, name })))
+        );
     } else {
       setDepartments([]);
-      setOrgs([]);
+      setOrgs(FALLBACK_ORGANISATIONS.map((name, i) => ({ id: `fo-${i}`, name })));
     }
     // Reset dependent fields
     setDepartment("");
@@ -475,11 +582,17 @@ export default function ProfileSetupPage() {
                         className={inputClass}
                       >
                         <option value="">Select department</option>
-                        {ministries.map((m) => (
-                          <option key={m.id} value={m.name}>
-                            {m.name}
-                          </option>
-                        ))}
+                        {departments.length > 0
+                          ? departments.map((d) => (
+                              <option key={d.id} value={d.name}>
+                                {d.name}
+                              </option>
+                            ))
+                          : FALLBACK_MINISTRIES.slice(0, 15).map((name, i) => (
+                              <option key={`sd-${i}`} value={name}>
+                                {name}
+                              </option>
+                            ))}
                       </select>
                     </div>
                   </>
