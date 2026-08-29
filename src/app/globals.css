@@ -1,39 +1,41 @@
 @import "tailwindcss";
 
 /* =============================================================================
- * Claymorphism Design System — Global Styles
+ * Professional Government Design System
  *
- * Claymorphism creates a soft, tactile, 3D look by using two shadows on
- * every interactive/raised element:
- *   1. A LIGHT shadow on the top-left (like light hitting the raised edge)
- *   2. A DARK shadow on the bottom-right (like the shadow cast by the raised edge)
- *
- * This tricks the eye into perceiving depth — the element looks like it's
- * made of soft clay and sitting above the background.
+ * Clean, flat, institutional style inspired by official Indian government portals.
+ * Square/rectangular buttons and cards. No curves, no claymorphism.
+ * Navy blue + white + saffron accent palette.
  * ============================================================================= */
 
 @theme inline {
-  /* Primary blue palette */
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-200: #bfdbfe;
-  --color-primary-300: #93c5fd;
-  --color-primary-400: #60a5fa;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
+  /* Navy blue — primary */
+  --color-primary-50: #f0f4ff;
+  --color-primary-100: #dce4f9;
+  --color-primary-200: #b8c9f0;
+  --color-primary-300: #8aa8e4;
+  --color-primary-400: #5b82d4;
+  --color-primary-500: #1a3a8a;
+  --color-primary-600: #142e6e;
+  --color-primary-700: #0f2354;
 
-  /* Cyan/teal accent palette */
-  --color-cyan-50: #ecfeff;
-  --color-cyan-100: #cffafe;
-  --color-cyan-200: #a5f3fc;
-  --color-cyan-300: #67e8f9;
-  --color-cyan-400: #22d3ee;
-  --color-cyan-500: #06b6d4;
-  --color-cyan-600: #0891b2;
+  /* Saffron accent */
+  --color-saffron-50: #fff7ed;
+  --color-saffron-100: #ffedd5;
+  --color-saffron-200: #fed7aa;
+  --color-saffron-300: #fdba74;
+  --color-saffron-400: #fb923c;
+  --color-saffron-500: #f97316;
+  --color-saffron-600: #ea580c;
 
-  /* Background — soft off-white with blue tint */
-  --color-surface: #f4f8fb;
+  /* Green — success / Indian flag */
+  --color-green-50: #f0fdf4;
+  --color-green-100: #dcfce7;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+
+  /* Surface */
+  --color-surface: #f8fafc;
   --color-surface-raised: #ffffff;
 
   /* Font families */
@@ -53,39 +55,30 @@
     color: #1e293b;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    font-family: var(--font-sans);
   }
 
   html {
     scroll-behavior: smooth;
   }
+
+  /* Square buttons by default — no rounded corners */
+  button, .btn {
+    border-radius: 4px !important;
+  }
+
+  /* Square cards — minimal radius */
+  .clay-card, [class*="ClayCard"] {
+    border-radius: 6px !important;
+  }
 }
 
-/* Floating blob animations */
-@keyframes float-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -30px) scale(1.05); }
-  66% { transform: translate(-20px, 20px) scale(0.95); }
+
+
+/* Stats counter animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes float-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  25% { transform: translate(-20px, 30px) scale(1.1); }
-  50% { transform: translate(20px, 10px) scale(0.9); }
-  75% { transform: translate(-10px, -20px) scale(1.05); }
-}
-
-@keyframes float-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(15px, -25px) scale(1.08); }
-}
-
-@keyframes float-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(-25px, -15px) scale(1.03); }
-  66% { transform: translate(10px, 25px) scale(0.97); }
-}
-
-.animate-float-1 { animation: float-1 12s ease-in-out infinite; }
-.animate-float-2 { animation: float-2 15s ease-in-out infinite; }
-.animate-float-3 { animation: float-3 10s ease-in-out infinite; }
-.animate-float-4 { animation: float-4 18s ease-in-out infinite; }
+.animate-count { animation: countUp 0.6s ease-out forwards; }

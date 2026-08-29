@@ -16,6 +16,7 @@ import { RequireAuth } from "@/components/auth/RequireAuth";
 import { supabase } from "@/lib/supabaseClient";
 import { ClayCard } from "@/components/ui";
 import { motion } from "framer-motion";
+import { useLanguage } from "@/context/LanguageContext";
 import {
   User,
   BookOpen,
@@ -98,6 +99,7 @@ export default function DashboardPage() {
 function DashboardContent() {
   const router = useRouter();
   const { user, session, signOut } = useAuth();
+  const { t } = useLanguage();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [competencies, setCompetencies] = useState<CompetencyScore[]>([]);
   const [gamification, setGamification] = useState<GamificationData | null>(null);
@@ -260,10 +262,10 @@ function DashboardContent() {
             <p className="text-slate-500 text-sm mt-1">
               {profile?.designation} {profile?.organisation ? `at ${profile.organisation}` : ""}
             </p>
-          </div>
-          <button
+          </div>            <button
             onClick={() => signOut()}
-            className="flex items-center gap-2 px-4 py-2 bg-white text-slate-600 rounded-xl text-sm font-medium border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+            className="flex items-center gap-2 px-4 py-2 bg-white text-slate-600 text-sm font-medium border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
+            style={{ borderRadius: "4px" }}
           >
             <LogOut size={16} />
             Sign Out
@@ -275,7 +277,7 @@ function DashboardContent() {
           {/* XP Card */}
           <ClayCard className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center">
+              <div className="w-10 h-10 bg-amber-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
                 <Zap size={20} className="text-amber-500" />
               </div>
               <div>
@@ -294,7 +296,7 @@ function DashboardContent() {
           {/* Streak Card */}
           <ClayCard className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center">
+              <div className="w-10 h-10 bg-orange-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
                 <Flame size={20} className="text-orange-500" />
               </div>
               <div>
@@ -308,7 +310,7 @@ function DashboardContent() {
           {/* Badges Card */}
           <ClayCard className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center">
+              <div className="w-10 h-10 bg-purple-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
                 <Trophy size={20} className="text-purple-500" />
               </div>
               <div>
@@ -322,7 +324,7 @@ function DashboardContent() {
           {/* Courses Enrolled */}
           <ClayCard className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+              <div className="w-10 h-10 bg-blue-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
                 <BookOpen size={20} className="text-blue-500" />
               </div>
               <div>
@@ -336,7 +338,7 @@ function DashboardContent() {
           {/* Certificates */}
           <ClayCard className="p-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
                 <Trophy size={20} className="text-emerald-500" />
               </div>
               <div>
@@ -354,7 +356,7 @@ function DashboardContent() {
             {/* Profile Card */}
             <ClayCard className="p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-400 to-cyan-400 flex items-center justify-center text-white font-semibold text-sm">
+                <div className="w-10 h-10 bg-primary-500 flex items-center justify-center text-white font-semibold text-sm" style={{ borderRadius: "4px" }}>
                   {profile?.full_name?.charAt(0) || user?.email?.charAt(0).toUpperCase() || "U"}
                 </div>
                 <div>
@@ -443,14 +445,14 @@ function DashboardContent() {
                         className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-r from-primary-50/50 to-cyan-50/50 border border-primary-100 hover:border-primary-200 transition-colors cursor-pointer"
                         onClick={() => router.push(`/courses/${rec.courseId}`)}
                       >
-                        <div className="shrink-0 w-8 h-8 rounded-lg bg-primary-100 flex items-center justify-center">
+                        <div className="shrink-0 w-8 h-8 bg-primary-100 flex items-center justify-center" style={{ borderRadius: "4px" }}>
                           <TrendingUp size={14} className="text-primary-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 truncate">{rec.courseTitle}</p>
                           <p className="text-xs text-primary-600 mt-0.5 font-medium">{rec.explanation}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary-100 text-primary-700 font-medium">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-primary-100 text-primary-700 font-medium" style={{ borderRadius: "4px" }}>
                               {Math.round(rec.score * 100)}% match
                             </span>
                             <span className="text-[10px] text-slate-400">{rec.signal}</span>
@@ -484,14 +486,14 @@ function DashboardContent() {
                         className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-primary-100 hover:bg-primary-50/30 transition-colors cursor-pointer"
                         onClick={() => router.push(`/courses/${course.id}`)}
                       >
-                        <div className="shrink-0 w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                        <div className="shrink-0 w-8 h-8 bg-primary-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
                           <BookOpen size={14} className="text-primary-600" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-slate-700 truncate">{course.title}</p>
                           <p className="text-xs text-slate-400 truncate mt-0.5">{course.description}</p>
                           <div className="flex items-center gap-3 mt-1.5">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-medium">iGOT</span>
+                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-700 font-medium" style={{ borderRadius: "4px" }}>iGOT</span>
                             {course.duration_hours > 0 && (
                               <span className="text-[10px] text-slate-400">{course.duration_hours}h</span>
                             )}
@@ -529,8 +531,8 @@ function InfoRow({ label, value, capitalize }: { label: string; value?: string; 
 
 function ActionLink({ icon, label, href }: { icon: React.ReactNode; label: string; href: string }) {
   return (
-    <a href={href} className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors no-underline group">
-      <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center group-hover:bg-primary-50 transition-colors">
+    <a href={href} className="flex items-center gap-3 p-3 hover:bg-slate-50 transition-colors no-underline group" style={{ borderRadius: "4px" }}>
+      <div className="w-8 h-8 bg-slate-100 flex items-center justify-center group-hover:bg-primary-50 transition-colors" style={{ borderRadius: "4px" }}>
         <span className="text-slate-500 group-hover:text-primary-600 transition-colors">{icon}</span>
       </div>
       <span className="text-sm text-slate-600 font-medium flex-1">{label}</span>

@@ -125,7 +125,7 @@ export default function RegisterPage() {
           </p>
 
           {resendMessage && (
-            <div className="mb-4 p-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 text-blue-700 text-sm">
               {resendMessage}
             </div>
           )}
@@ -134,7 +134,7 @@ export default function RegisterPage() {
             <button
               onClick={handleResendVerification}
               disabled={resending}
-              className="w-full py-3 bg-white text-slate-600 rounded-xl font-semibold border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+              className="w-full py-3 bg-white text-slate-600 font-semibold border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-center gap-2 text-sm disabled:opacity-50"
             >
               {resending ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -146,7 +146,7 @@ export default function RegisterPage() {
 
             <Link
               href="/login"
-              className="inline-flex items-center justify-center w-full gap-2 px-6 py-3 rounded-xl bg-slate-900 text-white text-sm font-medium no-underline hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center justify-center w-full gap-2 px-6 py-3 bg-slate-900 text-white text-sm font-medium no-underline hover:bg-slate-800 transition-colors"
             >
               Go to Sign In
             </Link>
@@ -174,7 +174,7 @@ export default function RegisterPage() {
             <img
               src="/logo.jpeg"
               alt="SkillUp"
-              className="h-10 w-10 rounded-full object-cover"
+              className="h-10 w-10 "
             />
             <span className="text-2xl font-bold text-slate-800">SkillUp</span>
           </Link>
@@ -189,7 +189,7 @@ export default function RegisterPage() {
           </p>
 
           {error && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm">
               {error}
             </div>
           )}
@@ -213,7 +213,7 @@ export default function RegisterPage() {
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
                   placeholder="Your full name"
                   disabled={loading}
                 />
@@ -237,7 +237,7 @@ export default function RegisterPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
                   placeholder="you@example.com"
                   disabled={loading}
                 />
@@ -261,7 +261,7 @@ export default function RegisterPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
                   placeholder="Min 8 chars, 1 number"
                   disabled={loading}
                 />
@@ -285,7 +285,7 @@ export default function RegisterPage() {
                   required
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-surface border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all text-sm"
                   placeholder="Re-enter password"
                   disabled={loading}
                 />
@@ -294,7 +294,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 bg-gradient-to-r from-primary-500 to-cyan-400 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-primary-500 to-cyan-400 text-white font-semibold shadow-md hover:shadow-lg transition-all cursor-pointer border-none disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {loading ? (
                 <Loader2 size={18} className="animate-spin" />
@@ -318,7 +318,7 @@ export default function RegisterPage() {
           {/* Google OAuth — only enabled provider */}
           <button
             onClick={handleGoogleSignUp}
-            className="w-full py-3 bg-white text-slate-700 rounded-xl font-medium border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-center gap-3 text-sm"
+            className="w-full py-3 bg-white text-slate-700 font-medium border border-slate-200 hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-center gap-3 text-sm"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path
