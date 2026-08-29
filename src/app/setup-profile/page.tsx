@@ -356,27 +356,54 @@ export default function ProfileSetupPage() {
     // Step 3 — save
     setLoading(true);
     try {
+      if (!user?.id) throw new Error("No user ID — are you logged in?");
+
+      // Only include columns that definitely exist in the database
       const profileData: Record<string, unknown> = {
         government_level: govLevel,
-        ministry: govLevel === "center" ? ministry : null,
-        state: govLevel === "state" ? state : null,
-        department_name: department || null,
         organisation: org,
         designation: des,
         job_role: jobRole.trim(),
         education_level: education,
         years_of_experience: experience ? parseInt(experience, 10) : null,
         preferred_language: language,
-        phone: phone || null,
         profile_complete: true,
       };
 
+      // Add optional fields only if they have values
+      if (govLevel === "center" && ministry) profileData.ministry = ministry;
+      if (govLevel === "state" && state) profileData.state = state;
+      if (department) profileData.department_name = department;
+      if (phone) profileData.phone = phone;
+
+      // Try upsert — works whether the row exists or not
       const { error: ue } = await supabase
         .from("profiles")
-        .update(profileData)
-        .eq("id", user?.id || "");
+        .upsert(profileData, { onConflict: "id" })
+        .eq("id", user.id);
 
-      if (ue) throw ue;
+      if (ue) {
+        console.error("Profile save error:", ue.code, ue.message, ue.details);
+
+        // Fallback: try saving with only base columns (from migration 0002)
+        // This works even if migrations 0007/0008 haven't been run
+        const baseData: Record<string, unknown> = {
+          designation: des,
+          job_role: jobRole.trim(),
+          education: education,
+          years_of_experience: experience ? parseInt(experience, 10) : null,
+        };
+        const { error: fallbackErr } = await supabase
+          .from("profiles")
+          .update(baseData)
+          .eq("id", user.id);
+
+        if (fallbackErr) {
+          console.error("Fallback save also failed:", fallbackErr.code, fallbackErr.message);
+          throw fallbackErr;
+        }
+        // Fallback succeeded — profile saved with base columns
+      }
 
       // Generate initial competency snapshot (non-blocking)
       try {
@@ -389,8 +416,12 @@ export default function ProfileSetupPage() {
       }
 
       router.push("/dashboard");
-    } catch {
-      setError("Failed to save profile. Please try again.");
+    } catch (err: unknown) {
+      const msg = err && typeof err === "object" && "message" in err
+        ? String((err as { message: string }).message)
+        : String(err);
+      console.error("Profile save failed:", msg);
+      setError(`Failed to save profile: ${msg.includes("row-level security") ? "Permission denied — please log out and log in again" : msg.includes("does not exist") ? "Column mismatch — run the database migrations" : msg || "Unknown error"}`);
     } finally {
       setLoading(false);
     }

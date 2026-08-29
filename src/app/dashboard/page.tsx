@@ -17,6 +17,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { ClayCard } from "@/components/ui";
 import { motion } from "framer-motion";
 import { useLanguage } from "@/context/LanguageContext";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { AIVoiceChat } from "@/components/chatbot/AIVoiceChat";
 import {
   User,
   BookOpen,
@@ -31,6 +33,9 @@ import {
   Zap,
   Sparkles,
   TrendingUp,
+  Award,
+  Info,
+  PlayCircle,
 } from "lucide-react";
 
 interface Profile {
@@ -106,6 +111,8 @@ function DashboardContent() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [igotCourses, setIgotCourses] = useState<IGOTCourse[]>([]);
   const [stats, setStats] = useState<{ coursesEnrolled: number; coursesCompleted: number; hoursLearned: number; certificatesEarned: number; competencyScore: number } | null>(null);
+  const [enrollments, setEnrollments] = useState<Array<{ id: string; course_id: string; status: string; progress_percent: number; course?: IGOTCourse }>>([]);
+  const [trendingCerts, setTrendingCerts] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -215,6 +222,49 @@ function DashboardContent() {
         } catch { /* silent */ }
       }
 
+      // Fetch enrollments for ongoing courses
+      try {
+        const { data: enrollData } = await supabase
+          .from("enrollments")
+          .select("id, course_id, status, progress_percent")
+          .eq("user_id", user.id)
+          .order("enrolled_at", { ascending: false });
+
+        if (enrollData && enrollData.length > 0) {
+          const enriched = await Promise.all(
+            enrollData.slice(0, 5).map(async (e) => {
+              // Try to get course title from iGOT
+              try {
+                const r = await fetch(`https://igotkarmayogi.gov.in/api/content/v1/read/${e.course_id}`, { signal: AbortSignal.timeout(5000) });
+                if (r.ok) {
+                  const d = await r.json();
+                  const c = d?.result?.content;
+                  if (c) return { ...e, course: { id: c.identifier || e.course_id, title: c.name, description: (c.description || "").replace(/<[^>]*>/g, "").substring(0, 100), source: "igot", duration_hours: 0.5, external_url: `https://portal.igotkarmayogi.gov.in/public/toc/${c.identifier || e.course_id}/overview` } };
+                }
+              } catch { /* silent */ }
+              return { ...e, course: { id: e.course_id, title: e.course_id.replace("do_", "Course "), description: "", source: "igot", duration_hours: 0, external_url: "" } };
+            })
+          );
+          setEnrollments(enriched);
+        }
+      } catch { /* silent */ }
+
+      // Generate trending certifications via AI (non-blocking)
+      try {
+        const aiResp = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ message: "List 5 trending certifications for government officials in India in 2026. Just the names, one per line, no numbers or bullets.", context: "User is a government official looking for trending certifications." }),
+        });
+        if (aiResp.ok) {
+          const aiData = await aiResp.json();
+          if (aiData.response) {
+            const certs = aiData.response.split("\n").filter((s: string) => s.trim().length > 3).slice(0, 5);
+            setTrendingCerts(certs);
+          }
+        }
+      } catch { /* silent */ }
+
       setLoading(false);
     };
 
@@ -272,82 +322,96 @@ function DashboardContent() {
           </button>
         </div>
 
-        {/* Top Row: Gamification Stats */}
-        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        {/* Top Row: Gamification Stats with Tooltips */}
+        <motion.div variants={fadeUp} initial="hidden" animate="visible" className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
           {/* XP Card */}
-          <ClayCard className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-amber-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
-                <Zap size={20} className="text-amber-500" />
+          <Tooltip content={t("tip_xp")}>
+            <ClayCard className="p-4 cursor-help">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-amber-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
+                  <Zap size={20} className="text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">{t("dash_xp")}</p>
+                  <p className="text-xl font-bold text-slate-800">{gamification?.xp || 0}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider">XP</p>
-                <p className="text-xl font-bold text-slate-800">{gamification?.xp || 0}</p>
+              <div className="mt-2">
+                <div className="w-full h-1.5 bg-slate-100" style={{ borderRadius: "4px" }}>
+                  <div className="h-full bg-amber-500" style={{ width: `${levelProgress}%`, borderRadius: "4px" }} />
+                </div>
+                <p className="text-[10px] text-slate-400 mt-1">Level {gamification?.level || 0}</p>
               </div>
-            </div>
-            <div className="mt-2">
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full" style={{ width: `${levelProgress}%` }} />
-              </div>
-              <p className="text-[10px] text-slate-400 mt-1">Level {gamification?.level || 0}</p>
-            </div>
-          </ClayCard>
+            </ClayCard>
+          </Tooltip>
 
           {/* Streak Card */}
-          <ClayCard className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
-                <Flame size={20} className="text-orange-500" />
+          <Tooltip content={t("tip_streak")}>
+            <ClayCard className="p-4 cursor-help">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-orange-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
+                  <Flame size={20} className="text-orange-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">{t("dash_streak")}</p>
+                  <p className="text-xl font-bold text-slate-800">{gamification?.streak || 0}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Streak</p>
-                <p className="text-xl font-bold text-slate-800">{gamification?.streak || 0}</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-2">days in a row</p>
-          </ClayCard>
+              <p className="text-[10px] text-slate-400 mt-2">{t("dash_days_row")}</p>
+            </ClayCard>
+          </Tooltip>
 
           {/* Badges Card */}
-          <ClayCard className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
-                <Trophy size={20} className="text-purple-500" />
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Badges</p>
-                <p className="text-xl font-bold text-slate-800">{earnedBadges.length}</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-2">of 8 earned</p>
-          </ClayCard>
+          <Tooltip content={t("tip_badges")}>
+            <a href="/dashboard/competencies" className="block no-underline">
+              <ClayCard className="p-4 cursor-help hover:border-primary-200 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-purple-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
+                    <Trophy size={20} className="text-purple-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">{t("dash_badges")}</p>
+                    <p className="text-xl font-bold text-slate-800">{earnedBadges.length}</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">{t("dash_of")} 8 earned</p>
+              </ClayCard>
+            </a>
+          </Tooltip>
 
           {/* Courses Enrolled */}
-          <ClayCard className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
-                <BookOpen size={20} className="text-blue-500" />
-              </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Courses</p>
-                <p className="text-xl font-bold text-slate-800">{stats?.coursesEnrolled || 0}</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-2">{stats?.coursesCompleted || 0} completed</p>
-          </ClayCard>
+          <Tooltip content={t("tip_courses")}>
+            <a href="/dashboard/learn" className="block no-underline">
+              <ClayCard className="p-4 cursor-help hover:border-primary-200 transition-all">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
+                    <BookOpen size={20} className="text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">{t("dash_courses")}</p>
+                    <p className="text-xl font-bold text-slate-800">{stats?.coursesEnrolled || 0}</p>
+                  </div>
+                </div>
+                <p className="text-[10px] text-slate-400 mt-2">{stats?.coursesCompleted || 0} completed</p>
+              </ClayCard>
+            </a>
+          </Tooltip>
 
           {/* Certificates */}
-          <ClayCard className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
-                <Trophy size={20} className="text-emerald-500" />
+          <Tooltip content={t("tip_certificates")}>
+            <ClayCard className="p-4 cursor-help">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-50 flex items-center justify-center" style={{ borderRadius: "4px" }}>
+                  <Award size={20} className="text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-wider">{t("dash_certificates")}</p>
+                  <p className="text-xl font-bold text-slate-800">{stats?.certificatesEarned || 0}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Certificates</p>
-                <p className="text-xl font-bold text-slate-800">{stats?.certificatesEarned || 0}</p>
-              </div>
-            </div>
-            <p className="text-[10px] text-slate-400 mt-2">earned</p>
-          </ClayCard>
+              <p className="text-[10px] text-slate-400 mt-2">earned</p>
+            </ClayCard>
+          </Tooltip>
         </motion.div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -466,15 +530,52 @@ function DashboardContent() {
               </motion.div>
             )}
 
-            {/* iGOT Courses */}
+            {/* Ongoing Courses */}
+            {enrollments.filter((e) => e.status === "in_progress").length > 0 && (
+              <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.15 }}>
+                <ClayCard className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <PlayCircle size={18} className="text-blue-500" />
+                      <h3 className="font-semibold text-slate-800">{t("dash_ongoing")}</h3>
+                    </div>
+                    <a href="/dashboard/learn" className="text-xs text-primary-600 hover:text-primary-700 font-medium">{t("dash_view_all")} →</a>
+                  </div>
+                  <div className="space-y-3">
+                    {enrollments.filter((e) => e.status === "in_progress").slice(0, 3).map((enroll) => (
+                      <div
+                        key={enroll.id}
+                        className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-100 cursor-pointer hover:border-blue-200 transition-colors"
+                        style={{ borderRadius: "4px" }}
+                        onClick={() => router.push(`/courses/${enroll.course_id}`)}
+                      >
+                        <BookOpen size={16} className="text-blue-500 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-700 truncate">{enroll.course?.title || enroll.course_id}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex-1 h-1 bg-blue-200" style={{ borderRadius: "4px" }}>
+                              <div className="h-full bg-blue-500" style={{ width: `${enroll.progress_percent || 0}%`, borderRadius: "4px" }} />
+                            </div>
+                            <span className="text-[10px] text-blue-600 font-medium">{Math.round(enroll.progress_percent || 0)}%</span>
+                          </div>
+                        </div>
+                        <ArrowRight size={14} className="text-blue-400 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                </ClayCard>
+              </motion.div>
+            )}
+
+            {/* iGOT Courses / Suggested for You */}
             <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.2 }}>
               <ClayCard className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <BookOpen size={18} className="text-primary-600" />
-                    <h3 className="font-semibold text-slate-800">iGOT Karmayogi Courses</h3>
+                    <h3 className="font-semibold text-slate-800">{recommendations.length > 0 ? t("dash_suggested") : t("dash_igot_courses")}</h3>
                   </div>
-                  <a href="/courses" className="text-xs text-primary-600 hover:text-primary-700 font-medium">View All →</a>
+                  <a href="/dashboard/learn" className="text-xs text-primary-600 hover:text-primary-700 font-medium">{t("dash_view_all")} →</a>
                 </div>
                 {igotCourses.length === 0 ? (
                   <p className="text-slate-400 text-sm">No courses available.</p>
@@ -511,10 +612,38 @@ function DashboardContent() {
               </ClayCard>
             </motion.div>
 
+            {/* Trending Certifications (AI-generated) */}
+            {trendingCerts.length > 0 && (
+              <motion.div variants={fadeUp} initial="hidden" animate="visible" transition={{ delay: 0.25 }}>
+                <ClayCard className="p-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Award size={18} className="text-emerald-500" />
+                    <h3 className="font-semibold text-slate-800">{t("dash_trending_cert")}</h3>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-emerald-50 text-emerald-600 font-medium" style={{ borderRadius: "4px" }}>AI</span>
+                  </div>
+                  <div className="space-y-2">
+                    {trendingCerts.map((cert, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2.5 bg-emerald-50 border border-emerald-100" style={{ borderRadius: "4px" }}>
+                        <span className="w-6 h-6 bg-emerald-500 text-white text-[10px] font-bold flex items-center justify-center shrink-0" style={{ borderRadius: "4px" }}>{i + 1}</span>
+                        <span className="text-sm text-slate-700 font-medium">{cert}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-3 flex items-center gap-1">
+                    <Sparkles size={10} /> AI-curated based on current government training trends
+                  </p>
+                </ClayCard>
+              </motion.div>
+            )}
 
           </div>
         </div>
       </div>
+      {/* AI Voice Chat */}
+      <AIVoiceChat
+        courseTitle={enrollments[0]?.course?.title}
+        courseDescription={enrollments[0]?.course?.description}
+      />
     </div>
   );
 }
