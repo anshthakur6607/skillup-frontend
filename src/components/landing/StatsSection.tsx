@@ -4,31 +4,34 @@
  * Shows what SkillUp actually does rather than made-up statistics.
  */
 import { Database, BookOpen, Users, Shield } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
-const stats = [
-  {
-    icon: Database,
-    label: "Competency Framework",
-    description: "Structured mapping across statistical, technical, and behavioural domains",
-  },
-  {
-    icon: BookOpen,
-    label: "iGOT Integration",
-    description: "Seamless connection to India's national learning platform for government officials",
-  },
-  {
-    icon: Users,
-    label: "Role-Based Paths",
-    description: "Personalised learning journeys for employees, managers, and administrators",
-  },
-  {
-    icon: Shield,
-    label: "Government-Grade Security",
-    description: "Row-level security, encrypted data, and compliance with government standards",
-  },
-];
+
 
 export function StatsSection() {
+  const { t } = useLanguage();
+  const stats = [
+    {
+      icon: Database,
+      label: t("stat_officials"),
+      description: "Structured mapping across statistical, technical, and behavioural domains",
+    },
+    {
+      icon: BookOpen,
+      label: t("stat_skills"),
+      description: "Seamless connection to India's national learning platform for government officials",
+    },
+    {
+      icon: Users,
+      label: t("stat_domains"),
+      description: "Personalised learning journeys for employees, managers, and administrators",
+    },
+    {
+      icon: Shield,
+      label: t("stat_trust"),
+      description: "Row-level security, encrypted data, and compliance with government standards",
+    },
+  ];
   return (
     <section className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

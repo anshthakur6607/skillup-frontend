@@ -5,22 +5,25 @@
  */
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
-
-const quickLinks = [
-  { label: "Features", href: "/#features" },
-  { label: "How It Works", href: "/#how-it-works" },
-  { label: "Sign In", href: "/login" },
-  { label: "Register", href: "/register" },
-];
-
-const resources = [
-  { label: "iGOT Karmayogi", href: "https://igotkarmayogi.gov.in", external: true },
-  { label: "Competency Framework", href: "/#features" },
-  { label: "API Documentation", href: "#" },
-  { label: "System Status", href: "/status" },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 export function Footer() {
+  const { t } = useLanguage();
+
+  const quickLinks = [
+    { label: t("nav_features"), href: "/#features" },
+    { label: t("nav_how_it_works"), href: "/#how-it-works" },
+    { label: t("nav_login"), href: "/login" },
+    { label: t("nav_signup"), href: "/register" },
+  ];
+
+  const resources = [
+    { label: "iGOT Karmayogi", href: "https://igotkarmayogi.gov.in", external: true },
+    { label: t("feature_1_title"), href: "/#features" },
+    { label: "API Documentation", href: "#" },
+    { label: "System Status", href: "/status" },
+  ];
+
   return (
     <footer id="about" className="bg-slate-900 text-slate-400 pt-16 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -33,16 +36,14 @@ export function Footer() {
               <span className="text-white font-bold text-lg">SkillUp</span>
             </div>
             <p className="text-sm leading-relaxed mb-4">
-              An AI-enabled Skill Intelligence &amp; Learning Platform for
-              India&apos;s Official Statistical System. Integrating with iGOT
-              Karmayogi for national-scale capacity building.
+              {t("footer_desc")}
             </p>
           </div>
 
           {/* Quick Links */}
           <div>
             <h4 className="text-white font-semibold text-sm mb-4 uppercase tracking-wider">
-              Quick Links
+              {t("footer_links")}
             </h4>
             <ul className="space-y-2 list-none p-0 m-0">
               {quickLinks.map((link) => (
@@ -61,7 +62,7 @@ export function Footer() {
           {/* Resources */}
           <div>
             <h4 className="text-white font-semibold text-sm mb-4 uppercase tracking-wider">
-              Resources
+              {t("footer_account")}
             </h4>
             <ul className="space-y-2 list-none p-0 m-0">
               {resources.map((link) => (
@@ -91,7 +92,7 @@ export function Footer() {
           {/* Contact */}
           <div>
             <h4 className="text-white font-semibold text-sm mb-4 uppercase tracking-wider">
-              Contact
+              {t("nav_about")}
             </h4>
             <ul className="space-y-3 list-none p-0 m-0">
               <li className="flex items-start gap-2 text-sm">
@@ -117,18 +118,17 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="border-t border-slate-800 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-xs text-slate-500">
-            &copy; {new Date().getFullYear()} SkillUp — Government of India. All
-            rights reserved.
+            &copy; {new Date().getFullYear()} SkillUp — {t("footer_copyright")}
           </p>
           <div className="flex gap-6">
             <a href="#" className="text-xs text-slate-500 hover:text-slate-300 no-underline transition-colors">
-              Privacy Policy
+              {t("footer_policy")}
             </a>
             <a href="#" className="text-xs text-slate-500 hover:text-slate-300 no-underline transition-colors">
-              Terms of Use
+              {t("footer_terms")}
             </a>
             <a href="#" className="text-xs text-slate-500 hover:text-slate-300 no-underline transition-colors">
-              Accessibility
+              {t("footer_accessibility")}
             </a>
           </div>
         </div>

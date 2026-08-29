@@ -7,8 +7,10 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { FloatingShape } from "@/components/ui";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function Hero() {
+  const { t } = useLanguage();
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden pt-16">
       {/* Background blobs */}
@@ -42,23 +44,21 @@ export function Hero() {
           {/* Badge */}
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary-50 border border-primary-100 text-primary-700 text-sm font-medium mb-6">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse" />
-            Building India&apos;s Statistical Workforce
+            {t("hero_badge")}
           </div>
 
           {/* Headline */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] tracking-tight mb-6">
-            Skill intelligence for a{" "}
+            {t("hero_title_1")}{" "}
             <span className="bg-gradient-to-r from-primary-600 to-cyan-500 bg-clip-text text-transparent">
-              data-driven India
-            </span>
+              {t("hero_title_2")}
+            </span>{" "}
+            {t("hero_title_3")}
           </h1>
 
           {/* Subheading */}
           <p className="text-lg sm:text-xl text-slate-500 leading-relaxed mb-8 max-w-2xl">
-            SkillUp maps competencies across India&apos;s Official Statistical
-            System, identifies skill gaps with AI, and delivers personalised
-            learning paths — integrating with iGOT Karmayogi to build
-            world-class capacity in government institutions.
+            {t("hero_desc")}
           </p>
 
           {/* CTAs */}
@@ -67,14 +67,14 @@ export function Hero() {
               href="/register"
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl bg-slate-900 text-white font-semibold text-base hover:bg-slate-800 transition-all no-underline shadow-lg shadow-slate-900/20"
             >
-              Get Started
+              {t("hero_cta_1")}
               <ArrowRight size={18} />
             </Link>
             <a
               href="#how-it-works"
               className="inline-flex items-center justify-center gap-2 px-8 py-3.5 rounded-xl bg-white text-slate-700 font-semibold text-base border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all no-underline"
             >
-              See How It Works
+              {t("hero_cta_2")}
             </a>
           </div>
         </div>
@@ -88,7 +88,7 @@ export function Hero() {
             <div className="relative w-72 h-48 rounded-2xl bg-white border border-slate-100 shadow-2xl p-6 flex flex-col justify-between">
               <div>
                 <div className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">
-                  Skill Assessment
+                  {t("dash_competency_radar")}
                 </div>
                 <div className="space-y-2">
                   <Bar label="Survey Design" value={85} />

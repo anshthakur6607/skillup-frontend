@@ -5,8 +5,10 @@
  */
 import { motion } from "framer-motion";
 import { Target, Globe, Lock } from "lucide-react";
+import { useLanguage } from "@/context/LanguageContext";
 
 export function About() {
+  const { t } = useLanguage();
   return (
     <section className="py-24 bg-surface">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -18,14 +20,10 @@ export function About() {
             transition={{ duration: 0.6 }}
           >
             <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-              About SkillUp
+              {t("nav_about")}
             </h2>
             <p className="text-slate-500 text-lg leading-relaxed">
-              SkillUp is an AI-enabled Skill Intelligence &amp; Learning Platform
-              built for India&apos;s Official Statistical System. It provides
-              department-level competency mapping, identifies skill gaps through
-              AI-driven assessment, and delivers personalised learning paths
-              integrated with the national iGOT Karmayogi platform.
+              {t("footer_desc")}
             </p>
           </motion.div>
         </div>
@@ -42,7 +40,7 @@ export function About() {
               <Target size={22} className="text-primary-600" />
             </div>
             <h3 className="font-semibold text-slate-800 mb-2">
-              Mission-Driven
+              {t("hero_secure")}
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
               Strengthening India&apos;s statistical capacity through systematic
@@ -61,7 +59,7 @@ export function About() {
               <Globe size={22} className="text-cyan-600" />
             </div>
             <h3 className="font-semibold text-slate-800 mb-2">
-              National Scale
+              {t("hero_govt")}
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
               Designed to serve ministries, departments, and statistical
@@ -80,7 +78,7 @@ export function About() {
               <Lock size={22} className="text-primary-600" />
             </div>
             <h3 className="font-semibold text-slate-800 mb-2">
-              Secure by Design
+              {t("hero_transparent")}
             </h3>
             <p className="text-slate-500 text-sm leading-relaxed">
               Government-grade security with row-level data protection, encrypted

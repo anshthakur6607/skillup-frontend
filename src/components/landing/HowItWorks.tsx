@@ -5,49 +5,46 @@
  */
 import { motion } from "framer-motion";
 import { ClipboardList, Sparkles, GraduationCap, BadgeCheck } from "lucide-react";
-
-const steps = [
-  {
-    icon: ClipboardList,
-    number: "01",
-    title: "Assess",
-    description:
-      "Complete a competency survey tailored to your role and department. The AI maps your current skill levels.",
-  },
-  {
-    icon: Sparkles,
-    number: "02",
-    title: "Analyse",
-    description:
-      "Skill gaps are identified against the framework. Your personalised learning path is generated automatically.",
-  },
-  {
-    icon: GraduationCap,
-    number: "03",
-    title: "Learn",
-    description:
-      "Access curated courses from iGOT Karmayogi and internal resources, guided by an AI tutor when you need help.",
-  },
-  {
-    icon: BadgeCheck,
-    number: "04",
-    title: "Certify",
-    description:
-      "Pass adaptive assessments and earn verified certificates that validate your competencies for career progression.",
-  },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 export function HowItWorks() {
+  const { t } = useLanguage();
+  const steps = [
+    {
+      icon: ClipboardList,
+      number: "01",
+      title: t("how_step1_title"),
+      description: t("how_step1_desc"),
+    },
+    {
+      icon: Sparkles,
+      number: "02",
+      title: t("how_step2_title"),
+      description: t("how_step2_desc"),
+    },
+    {
+      icon: GraduationCap,
+      number: "03",
+      title: t("how_step3_title"),
+      description: t("how_step3_desc"),
+    },
+    {
+      icon: BadgeCheck,
+      number: "04",
+      title: t("how_step4_title"),
+      description: t("how_step4_desc"),
+    },
+  ];
+
   return (
     <section id="how-it-works" className="py-24 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-            How SkillUp works
+            {t("how_title")}
           </h2>
           <p className="text-slate-500 text-lg max-w-2xl mx-auto">
-            A structured four-step journey from assessment to certification,
-            designed for busy government professionals.
+            {t("how_step1_desc")}
           </p>
         </div>
 

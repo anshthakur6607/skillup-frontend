@@ -118,37 +118,50 @@ export default function LearnHubPage() {
         try {
           const { data: enrollData } = await supabase
             .from("enrollments")
-            .select("*")
+            .select("*, courses!inner(id, external_id, title, description, source, duration_hours, external_url, difficulty, module_count)")
             .eq("user_id", user.id)
             .order("enrolled_at", { ascending: false });
 
           if (enrollData && enrollData.length > 0) {
-            // Fetch course details for each enrollment
+            // Course details come from the join above; also try iGOT for missing fields
             const enrollsWithCourses = await Promise.all(
               enrollData.map(async (enroll) => {
-                // Try fetching from backend first
-                try {
-                  const resp = await fetch(`/api/courses/${enroll.course_id}`);
-                  if (resp.ok) {
-                    const d = await resp.json();
-                    return { ...enroll, course: d.data || d };
-                  }
-                } catch { /* fallback */ }
+                // If the join gave us course data, use it
+                const joined = enroll.courses as Record<string, unknown> | null;
+                if (joined && joined.title && joined.title !== joined.id) {
+                  return {
+                    ...enroll,
+                    course: {
+                      id: String(joined.id),
+                      title: String(joined.title),
+                      description: String(joined.description || ""),
+                      source: String(joined.source || "igot"),
+                      duration_hours: Number(joined.duration_hours) || 0,
+                      external_url: String(joined.external_url || ""),
+                      difficulty: String(joined.difficulty || "Beginner"),
+                      module_count: Number(joined.module_count) || 0,
+                    },
+                  };
+                }
 
-                // Try iGOT API
-                const igotCourse = await fetchIGOTCourse(enroll.course_id);
-                if (igotCourse) return { ...enroll, course: igotCourse };
+                // Use external_id to fetch from iGOT (NOT the UUID course_id)
+                const extId = joined?.external_id ? String(joined.external_id) : null;
+                if (extId) {
+                  const igotCourse = await fetchIGOTCourse(extId);
+                  if (igotCourse) return { ...enroll, course: igotCourse };
+                }
 
-                // Fallback: minimal course info
+                // Fallback: minimal course info using external_id if available
+                const fallbackId = extId || String(enroll.course_id);
                 return {
                   ...enroll,
                   course: {
-                    id: enroll.course_id,
-                    title: enroll.course_id.replace("do_", "Course "),
+                    id: fallbackId,
+                    title: "Course",
                     description: "Course details loading...",
                     source: "igot",
                     duration_hours: 0,
-                    external_url: `https://portal.igotkarmayogi.gov.in/public/toc/${enroll.course_id}/overview`,
+                    external_url: `https://portal.igotkarmayogi.gov.in/public/toc/${fallbackId}/overview`,
                   },
                 };
               })
