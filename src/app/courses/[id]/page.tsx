@@ -138,6 +138,35 @@ export default function CourseDetailPage() {
       // backend not available, fetch from iGOT directly
     }
 
+    // Also check Supabase directly for enrollment
+    try {
+      const { supabase } = await import("@/lib/supabaseClient");
+      const { data: courseRow } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("external_id", courseId)
+        .single();
+
+      if (courseRow) {
+        const { data: enroll } = await supabase
+          .from("enrollments")
+          .select("id, status, progress_percent, started_at, completed_at")
+          .eq("course_id", courseRow.id)
+          .eq("user_id", session?.user?.id || "")
+          .single();
+
+        if (enroll) {
+          setEnrollment(enroll);
+          if (enroll.status === "completed") {
+            setProgress(100);
+            setCompleted(true);
+          }
+        }
+      }
+    } catch {
+      // silent
+    }
+
     // Fetch directly from iGOT content API
     try {
       const resp = await fetch(
@@ -249,21 +278,67 @@ export default function CourseDetailPage() {
         const data = await resp.json();
         setEnrollment(data.data);
         setEnrolling(false);
-        // Open iGOT course in new tab after enrolling
         if (course?.external_url) window.open(course.external_url, "_blank");
         return;
       }
     } catch {
-      // backend not available
+      // backend not available — save directly to Supabase
     }
-    // Fallback: create local enrollment and open iGOT
-    setEnrollment({
-      id: "local",
-      status: "not_started",
-      progress_percent: 0,
-      started_at: null,
-      completed_at: null,
-    });
+
+    // Fallback: save enrollment to Supabase directly
+    try {
+      const { supabase } = await import("@/lib/supabaseClient");
+      const userId = session.user.id;
+
+      // 1. Check if course exists in our DB by external_id
+      let { data: courseRow } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("external_id", courseId)
+        .single();
+
+      // 2. If not, insert it
+      if (!courseRow) {
+        const { data: newCourse } = await supabase
+          .from("courses")
+          .insert({
+            title: course?.title || courseId,
+            description: course?.description || "",
+            source: "igot",
+            external_id: courseId,
+            external_url: course?.external_url || `https://portal.igotkarmayogi.gov.in/public/toc/${courseId}/overview`,
+            duration_hours: course?.duration_hours || 0.5,
+            is_active: true,
+          })
+          .select("id")
+          .single();
+        courseRow = newCourse;
+      }
+
+      if (courseRow) {
+        // 3. Create enrollment
+        const { data: enroll, error } = await supabase
+          .from("enrollments")
+          .upsert(
+            {
+              user_id: userId,
+              course_id: courseRow.id,
+              status: "not_started",
+              progress_percent: 0,
+            },
+            { onConflict: "user_id,course_id" }
+          )
+          .select("id, status, progress_percent, started_at, completed_at")
+          .single();
+
+        if (!error && enroll) {
+          setEnrollment(enroll);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to save enrollment locally:", err);
+    }
+
     setEnrolling(false);
     if (course?.external_url) window.open(course.external_url, "_blank");
   }
@@ -284,10 +359,37 @@ export default function CourseDetailPage() {
         return;
       }
     } catch {
-      // backend not available
+      // backend not available — update Supabase directly
     }
-    // Fallback: mark as in progress locally and open iGOT
-    setEnrollment((prev) => prev ? { ...prev, status: "in_progress", started_at: new Date().toISOString() } : prev);
+
+    // Fallback: update enrollment status in Supabase
+    try {
+      const { supabase } = await import("@/lib/supabaseClient");
+      // Find the course in our DB
+      const { data: courseRow } = await supabase
+        .from("courses")
+        .select("id")
+        .eq("external_id", courseId)
+        .single();
+
+      if (courseRow) {
+        await supabase
+          .from("enrollments")
+          .update({
+            status: "in_progress",
+            started_at: new Date().toISOString(),
+          })
+          .eq("user_id", session.user.id)
+          .eq("course_id", courseRow.id);
+
+        setEnrollment((prev) =>
+          prev ? { ...prev, status: "in_progress", started_at: new Date().toISOString() } : prev
+        );
+      }
+    } catch (err) {
+      console.error("Failed to update enrollment:", err);
+    }
+
     setStarting(false);
     if (course?.external_url) window.open(course.external_url, "_blank");
   }

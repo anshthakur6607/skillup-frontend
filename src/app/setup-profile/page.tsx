@@ -208,36 +208,47 @@ export default function ProfileSetupPage() {
   const [orgs, setOrgs] = useState<OItem[]>([]);
   const [designations, setDesignations] = useState<LItem[]>([]);
 
-  // Fetch base lookups on mount
+  // Set all fallback data immediately so dropdowns are never empty
+  const setFallbackData = useCallback(() => {
+    setMinistries(FALLBACK_MINISTRIES.map((name, i) => ({ id: `fm-${i}`, name })));
+    setStates(FALLBACK_STATES.map((name, i) => ({ id: `fs-${i}`, name })));
+    setDesignations(FALLBACK_DESIGNATIONS.map((name, i) => ({ id: `fd-${i}`, name })));
+    setOrgs(FALLBACK_ORGANISATIONS.map((name, i) => ({ id: `fo-${i}`, name })));
+  }, []);
+
+  // Fetch base lookups on mount — always set fallbacks first, then try API
   const fetchBaseLookups = useCallback(async () => {
+    // Set fallbacks FIRST so dropdowns are never empty
+    setFallbackData();
+
     if (!session) return;
     const h = { Authorization: "Bearer " + session.access_token };
+
+    // Fetch each independently — if one fails, others still work
     try {
-      const [m, s, d] = await Promise.all([
-        fetch("/api/lookups/central_ministries", { headers: h }).then((r) => r.json()),
-        fetch("/api/lookups/indian_states", { headers: h }).then((r) => r.json()),
-        fetch("/api/lookups/designations", { headers: h }).then((r) => r.json()),
-      ]);
-      // Use API data if available, otherwise use fallbacks
-      setMinistries(
-        m.data && m.data.length > 0
-          ? m.data
-          : FALLBACK_MINISTRIES.map((name, i) => ({ id: `fm-${i}`, name }))
-      );
-      setStates(
-        s.data && s.data.length > 0
-          ? s.data
-          : FALLBACK_STATES.map((name, i) => ({ id: `fs-${i}`, name }))
-      );
-      setDesignations(
-        d.data && d.data.length > 0
-          ? d.data
-          : FALLBACK_DESIGNATIONS.map((name, i) => ({ id: `fd-${i}`, name }))
-      );
-    } catch {
-      /* silent — dropdowns will just be empty */
-    }
-  }, [session]);
+      const mResp = await fetch("/api/lookups/central_ministries", { headers: h });
+      if (mResp.ok) {
+        const m = await mResp.json();
+        if (m.data && m.data.length > 0) setMinistries(m.data);
+      }
+    } catch { /* fallback already set */ }
+
+    try {
+      const sResp = await fetch("/api/lookups/indian_states", { headers: h });
+      if (sResp.ok) {
+        const s = await sResp.json();
+        if (s.data && s.data.length > 0) setStates(s.data);
+      }
+    } catch { /* fallback already set */ }
+
+    try {
+      const dResp = await fetch("/api/lookups/designations", { headers: h });
+      if (dResp.ok) {
+        const d = await dResp.json();
+        if (d.data && d.data.length > 0) setDesignations(d.data);
+      }
+    } catch { /* fallback already set */ }
+  }, [session, setFallbackData]);
 
   useEffect(() => {
     fetchBaseLookups();
@@ -253,8 +264,11 @@ export default function ProfileSetupPage() {
       // Fetch departments under ministry
       fetch(`/api/lookups/departments/filter?ministry=${encodeURIComponent(ministry)}`, { headers: h })
         .then((r) => r.json())
-        .then((d) => { if (d.data) setDepartments(d.data); })
-        .catch(() => setDepartments([]));
+        .then((d) => {
+          if (d.data && d.data.length > 0) setDepartments(d.data);
+          else setDepartments(FALLBACK_MINISTRIES.slice(0, 15).map((name, i) => ({ id: `sd-${i}`, name })));
+        })
+        .catch(() => setDepartments(FALLBACK_MINISTRIES.slice(0, 15).map((name, i) => ({ id: `sd-${i}`, name }))));
 
       // Fetch orgs under ministry
       fetch(`/api/lookups/organisations/filter?ministry=${encodeURIComponent(ministry)}`, { headers: h })
@@ -272,8 +286,11 @@ export default function ProfileSetupPage() {
       // Fetch departments under state
       fetch(`/api/lookups/departments/filter?state=${encodeURIComponent(state)}`, { headers: h })
         .then((r) => r.json())
-        .then((d) => { if (d.data) setDepartments(d.data); })
-        .catch(() => setDepartments([]));
+        .then((d) => {
+          if (d.data && d.data.length > 0) setDepartments(d.data);
+          else setDepartments(FALLBACK_MINISTRIES.slice(0, 15).map((name, i) => ({ id: `sd-${i}`, name })));
+        })
+        .catch(() => setDepartments(FALLBACK_MINISTRIES.slice(0, 15).map((name, i) => ({ id: `sd-${i}`, name }))));
 
       // Fetch orgs under state
       fetch(`/api/lookups/organisations/filter?state=${encodeURIComponent(state)}`, { headers: h })
