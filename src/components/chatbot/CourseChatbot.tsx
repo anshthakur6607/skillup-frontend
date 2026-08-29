@@ -12,7 +12,7 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { getAIResponse as callAI } from "@/lib/aiService";
+
 import {
   MessageCircle,
   X,
@@ -133,7 +133,23 @@ URL: https://portal.igotkarmayogi.gov.in/public/toc/${courseId}/overview
     setInput("");
     setIsTyping(true);
 
-    const response = await callAI(text, courseContext, language);
+    // Call backend AI proxy (API keys stay server-side)
+    let response: string;
+    try {
+      const { data: { session } } = await import("@/lib/supabaseClient").then(m => m.supabase.auth.getSession());
+      const resp = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ message: text, context: courseContext, language }),
+      });
+      const data = await resp.json();
+      response = data?.data?.response || generateLocalResponse(text, courseContext);
+    } catch {
+      response = generateLocalResponse(text, courseContext);
+    }
 
     const assistantMsg: Message = {
       id: (Date.now() + 1).toString(),
@@ -204,6 +220,25 @@ URL: https://portal.igotkarmayogi.gov.in/public/toc/${courseId}/overview
       }
       return !prev;
     });
+  }
+
+  // Local fallback when backend is unreachable
+  function generateLocalResponse(msg: string, ctx: string): string {
+    const titleMatch = ctx.match(/COURSE:\s*(.+)/i);
+    const title = titleMatch?.[1] || "this course";
+    const lower = msg.toLowerCase();
+    if (lower.match(/^(hi|hello|hey)/)) return `Hello! I'm your AI assistant for "${title}". Ask me anything!`;
+    if (lower.includes("duration") || lower.includes("how long")) {
+      const dur = ctx.match(/DURATION:\s*(.+)/i)?.[1] || "unknown";
+      return `This course is approximately ${dur} long.`;
+    }
+    if (lower.includes("module") || lower.includes("content"))
+      return `Module details are available on iGOT Karmayogi. Click "Open on iGOT" to see the full module list.`;
+    if (lower.includes("assessment") || lower.includes("quiz"))
+      return `After completing the course, take the SkillUp AI assessment with adaptive MCQs.`;
+    if (lower.includes("certificate"))
+      return `Upon passing the assessment, you receive a digital certificate with a unique verification code.`;
+    return `Great question about "${title}". Visit the course on iGOT Karmayogi for more details!`;
   }
 
   return (

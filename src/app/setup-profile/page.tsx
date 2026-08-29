@@ -28,6 +28,7 @@ import {
   ClipboardCheck,
   Award,
   Loader2,
+  Shield,
 } from "lucide-react";
 
 interface LItem {
@@ -99,11 +100,12 @@ const COMPETENCY_DOMAINS = [
 export default function ProfileSetupPage() {
   const router = useRouter();
   const { user, session } = useAuth();
-  const [step, setStep] = useState(1);
+  const [step, setStep] = useState(0); // 0=consent, 1=org, 2=professional, 3=review
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   // Step 1 — Organization
+  const [consentGiven, setConsentGiven] = useState(false);
   const [govLevel, setGovLevel] = useState<"" | "center" | "state">("");
   const [ministry, setMinistry] = useState("");
   const [state, setState] = useState("");
@@ -207,6 +209,12 @@ export default function ProfileSetupPage() {
     e.preventDefault();
     setError("");
 
+    if (step === 0) {
+      if (!consentGiven) { setError("Please provide consent to continue."); return; }
+      setStep(1);
+      return;
+    }
+
     if (step === 1) {
       const ve = validateStep1();
       if (ve) { setError(ve); return; }
@@ -245,6 +253,17 @@ export default function ProfileSetupPage() {
         .eq("id", user?.id || "");
 
       if (ue) throw ue;
+
+      // Generate initial competency snapshot (non-blocking)
+      try {
+        await fetch("/api/competencies/snapshot", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch {
+        // Non-critical — dashboard will still work
+      }
+
       router.push("/dashboard");
     } catch {
       setError("Failed to save profile. Please try again.");
@@ -267,26 +286,27 @@ export default function ProfileSetupPage() {
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-slate-800">Complete Your Profile</h1>
           <p className="text-slate-500 text-sm mt-1">
+            {step === 0 && "Data consent & privacy"}
             {step === 1 && "Tell us about your organisation"}
             {step === 2 && "Your professional background"}
             {step === 3 && "Review and confirm"}
           </p>
           {/* Step indicator */}
-          <div className="flex items-center gap-2 mt-4 justify-center">
-            {[1, 2, 3].map((s) => (
-              <div key={s} className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 mt-4 justify-center">
+            {[0, 1, 2, 3].map((s) => (
+              <div key={s} className="flex items-center gap-1.5">
                 <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     step >= s
                       ? "bg-gradient-to-r from-primary-500 to-cyan-400 text-white"
                       : "bg-slate-200 text-slate-500"
                   }`}
                 >
-                  {step > s ? <Check size={14} /> : s}
+                  {step > s ? <Check size={12} /> : s + 1}
                 </div>
                 {s < 3 && (
                   <div
-                    className={`w-12 h-0.5 rounded ${
+                    className={`w-8 h-0.5 rounded ${
                       step > s ? "bg-gradient-to-r from-primary-500 to-cyan-400" : "bg-slate-200"
                     }`}
                   />
@@ -304,6 +324,83 @@ export default function ProfileSetupPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* ========== STEP 0: Consent ========== */}
+            {step === 0 && (
+              <>
+                <div className="text-center mb-4">
+                  <div className="w-16 h-16 rounded-full bg-primary-50 flex items-center justify-center mx-auto mb-4">
+                    <Shield size={28} className="text-primary-600" />
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-800">Data Consent & Privacy</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    Before we set up your profile, we need your consent for data handling.
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-2">What data we collect</h3>
+                    <ul className="text-xs text-slate-600 space-y-1.5">
+                      <li className="flex items-start gap-2">
+                        <Check size={12} className="text-green-500 mt-0.5 shrink-0" />
+                        <span>Your name, designation, department, and job role (for personalised recommendations)</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check size={12} className="text-green-500 mt-0.5 shrink-0" />
+                        <span>Your education and experience (to calibrate skill expectations)</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check size={12} className="text-green-500 mt-0.5 shrink-0" />
+                        <span>Your course completions and assessment scores (to track your skill growth)</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
+                    <h3 className="text-sm font-semibold text-amber-800 mb-2">How we protect your data</h3>
+                    <ul className="text-xs text-amber-700 space-y-1.5">
+                      <li className="flex items-start gap-2">
+                        <Check size={12} className="text-amber-600 mt-0.5 shrink-0" />
+                        <span>Your data is encrypted and stored securely in India (MeghRaj/GI Cloud compliant)</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check size={12} className="text-amber-600 mt-0.5 shrink-0" />
+                        <span>Only you and your designated managers can see your individual scores</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <Check size={12} className="text-amber-600 mt-0.5 shrink-0" />
+                        <span>We never share personal data with third parties without your explicit consent</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
+                    <h3 className="text-sm font-semibold text-blue-800 mb-2">APAR / Performance Data (Optional)</h3>
+                    <p className="text-xs text-blue-700 mb-3">
+                      If you choose to link your APAR (Annual Performance Appraisal Report) data, SkillUp can provide more accurate skill-gap analysis aligned with your career progression. This is entirely optional and can be enabled later.
+                    </p>
+                  </div>
+
+                  <label className="flex items-start gap-3 p-4 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={consentGiven}
+                      onChange={(e) => setConsentGiven(e.target.checked)}
+                      className="w-4 h-4 mt-0.5 text-primary-500 rounded"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-slate-700">
+                        I consent to SkillUp collecting and processing my data as described above
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        You can withdraw consent at any time from your profile settings. Required to use the platform.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </>
+            )}
+
             {/* ========== STEP 1: Organization ========== */}
             {step === 1 && (
               <>
