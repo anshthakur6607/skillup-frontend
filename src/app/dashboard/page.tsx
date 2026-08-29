@@ -3,9 +3,9 @@
  * Dashboard — main authenticated user page.
  *
  * Shows:
- * 1. Profile summary with iGOT sync status
+ * 1. Profile summary with gamification stats
  * 2. Available iGOT courses
- * 3. Upcoming NSSTA TPAC training sessions
+ * 3. Skill heatmap preview
  * 4. Quick links to competency assessment
  */
 import { useEffect, useState } from "react";
@@ -14,7 +14,6 @@ import { useAuth } from "@/context/AuthContext";
 import { RequireAuth } from "@/components/auth/RequireAuth";
 import { supabase } from "@/lib/supabaseClient";
 import { ClayCard } from "@/components/ui";
-import { getTPACSessions } from "@/lib/api";
 import {
   User,
   BookOpen,
@@ -40,17 +39,6 @@ interface Profile {
   profile_complete: boolean;
 }
 
-interface TPACSession {
-  id: string;
-  title: string;
-  description: string;
-  training_type: string;
-  start_date: string;
-  end_date: string;
-  location: string;
-  competencies: string[];
-}
-
 interface IGOTCourse {
   id: string;
   title: string;
@@ -72,7 +60,6 @@ function DashboardContent() {
   const router = useRouter();
   const { user, session, signOut } = useAuth();
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [tpacSessions, setTpacSessions] = useState<TPACSession[]>([]);
   const [igotCourses, setIgotCourses] = useState<IGOTCourse[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -140,12 +127,6 @@ function DashboardContent() {
         } catch {
           // silent
         }
-      }
-
-      // Fetch TPAC sessions
-      const tpacResp = await getTPACSessions(token);
-      if (tpacResp.data && typeof tpacResp.data === "object" && "data" in tpacResp.data) {
-        setTpacSessions((tpacResp.data as { data: TPACSession[] }).data || []);
       }
 
       setLoading(false);
@@ -227,13 +208,13 @@ function DashboardContent() {
                 />
                 <ActionLink
                   icon={<BookOpen size={16} />}
-                  label="Browse Courses"
+                  label="Browse All Courses"
                   href="/courses"
                 />
                 <ActionLink
-                  icon={<Calendar size={16} />}
-                  label="Training Calendar"
-                  href="#tpac"
+                  icon={<BarChart3 size={16} />}
+                  label="Skill Heatmap"
+                  href="/dashboard/heatmap"
                 />
               </div>
             </ClayCard>
@@ -299,70 +280,7 @@ function DashboardContent() {
               )}
             </ClayCard>
 
-            {/* NSSTA TPAC Sessions */}
-            <ClayCard className="p-6" id="tpac">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar size={18} className="text-cyan-600" />
-                  <h3 className="font-semibold text-slate-800">NSSTA TPAC Training</h3>
-                </div>
-                <span className="text-xs text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">
-                  {tpacSessions.length} upcoming
-                </span>
-              </div>
-              {tpacSessions.length === 0 ? (
-                <p className="text-slate-400 text-sm">No upcoming sessions.</p>
-              ) : (
-                <div className="space-y-3">
-                  {tpacSessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="p-3 rounded-xl bg-slate-50 border border-slate-100 hover:border-cyan-100 transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-medium text-slate-700">
-                            {session.title}
-                          </p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {session.location}
-                          </p>
-                        </div>
-                        <span className="shrink-0 text-[10px] uppercase tracking-wider bg-cyan-50 text-cyan-700 px-2 py-0.5 rounded-lg font-medium">
-                          {session.training_type}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-2">
-                        <span className="text-xs text-slate-500">
-                          {new Date(session.start_date).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                          {session.end_date &&
-                            ` — ${new Date(session.end_date).toLocaleDateString("en-IN", {
-                              day: "numeric",
-                              month: "short",
-                            })}`}
-                        </span>
-                      </div>
-                      {session.competencies && session.competencies.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {session.competencies.slice(0, 3).map((c) => (
-                            <span
-                              key={c}
-                              className="text-[10px] bg-white text-slate-500 px-1.5 py-0.5 rounded border border-slate-100"
-                            >
-                              {c}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ClayCard>
+
           </div>
         </div>
       </div>

@@ -140,8 +140,17 @@ function shuffle<T>(arr: T[]): T[] {
 // ─── MAIN: GET AI RESPONSE ───────────────────────────────────────────────────
 export async function getAIResponse(
   prompt: string,
-  context: string
+  context: string,
+  language?: string
 ): Promise<string> {
+  // Add language instruction to context if non-English
+  let langContext = context;
+  if (language && language !== "en") {
+    langContext += `
+
+IMPORTANT: The user prefers responses in ${language}. Please respond in ${language} when possible. If the topic requires English technical terms, include them but explain in ${language}.`;
+  }
+
   // Randomly pick provider order
   const providers: Provider[] = shuffle(["gemini", "sarvam"]);
 
@@ -149,7 +158,7 @@ export async function getAIResponse(
     if (provider === "gemini") {
       const models = shuffle(GEMINI_MODELS);
       for (const model of models) {
-        const result = await callGemini(model, prompt, context);
+        const result = await callGemini(model, prompt, langContext);
         if (result) {
           console.log(`AI response from Gemini ${model}`);
           return result;
@@ -158,7 +167,7 @@ export async function getAIResponse(
     } else {
       const models = shuffle(SARVAM_MODELS);
       for (const model of models) {
-        const result = await callSarvam(model, prompt, context);
+        const result = await callSarvam(model, prompt, langContext);
         if (result) {
           console.log(`AI response from Sarvam ${model}`);
           return result;
@@ -169,7 +178,7 @@ export async function getAIResponse(
 
   // Both providers failed — return local fallback
   console.warn("All AI providers failed, using local fallback");
-  return generateLocalFallback(prompt, context);
+  return generateLocalFallback(prompt, langContext);
 }
 
 // ─── LOCAL FALLBACK (no API needed) ──────────────────────────────────────────

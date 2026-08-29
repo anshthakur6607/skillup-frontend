@@ -41,7 +41,7 @@ export default function StatusPage() {
   const [supabaseCheck, setSupabaseCheck] = useState<CheckResult>({ status: 'checking', message: 'Checking...' });
   const [sessionCheck, setSessionCheck] = useState<CheckResult>({ status: "checking", message: "Checking..." });
   const [rls, setRls] = useState<CheckResult>({ status: 'checking', message: 'Checking...' });
-  const [integration, setIntegration] = useState<CheckResult>({ status: 'checking', message: 'Checking...' });
+
 
   const checkEnvVars = useCallback(() => {
     setEnv({ status: 'checking', message: 'Checking...' });
@@ -96,18 +96,7 @@ export default function StatusPage() {
     } catch (e) { setRls({ status: 'pass', message: `RLS blocked access (${e instanceof Error ? e.message : 'error'}).` }); }
   }, []);
 
-  const checkIntegration = useCallback(async () => {
-    setIntegration({ status: 'checking', message: 'Checking platform integration...' });
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) { setIntegration({ status: 'fail', message: 'Not logged in — log in to test this check.' }); return; }
-    try {
-      const resp = await authGet('/api/integrations/tpac', session.access_token);
-      if (resp.error) { setIntegration({ status: 'fail', message: 'Integration endpoint error: ' + resp.error }); return; }
-      const json = resp.data as { status?: string; data?: unknown[] };
-      if (json.status === 'ok') setIntegration({ status: 'pass', message: 'Platform integration active. TPAC endpoint responding. (' + ((json.data as unknown[])?.length || 0) + ' sessions available)' });
-      else setIntegration({ status: 'fail', message: 'Integration endpoint returned unexpected response.' });
-    } catch (e) { setIntegration({ status: 'fail', message: 'Could not check integration: ' + (e instanceof Error ? e.message : 'Unknown') }); }
-  }, []);
+
 
   useEffect(() => {
     checkEnvVars();
@@ -115,8 +104,7 @@ export default function StatusPage() {
     checkSupabase();
     checkRLS();
     checkSession();
-    checkIntegration();
-  }, [checkEnvVars, checkBackend, checkHeaders, checkSupabase, checkRLS, checkSession, checkIntegration]);
+  }, [checkEnvVars, checkBackend, checkHeaders, checkSupabase, checkRLS, checkSession]);
 
   const runAll = () => {
     checkEnvVars();
@@ -124,7 +112,6 @@ export default function StatusPage() {
     checkSupabase();
     checkRLS();
     checkSession();
-    checkIntegration();
   };
 
   return (
@@ -142,7 +129,7 @@ export default function StatusPage() {
           <StatusRow label="4. Supabase project reachable" result={supabaseCheck} onRetry={checkSupabase} />
           <StatusRow label="5. RLS enforcement (anonymous blocked)" result={rls} onRetry={checkRLS} />
           <StatusRow label="6. Backend recognizes session (GET /api/auth/me)" result={sessionCheck} onRetry={checkSession} />
-          <StatusRow label="7. Platform integration (iGOT + NSSTA TPAC)" result={integration} onRetry={checkIntegration} />
+
         </ClayCard>
         <div className="mt-6 text-center">
           <button onClick={runAll} className="px-6 py-3 bg-gradient-to-r from-primary-500 to-cyan-400 text-white rounded-xl font-semibold shadow-[4px_4px_8px_#d1d9e6,-4px_-4px_8px_#ffffff] hover:shadow-[6px_6px_12px_#c1c9d6,-6px_-6px_12px_#ffffff] transition-all cursor-pointer border-none">Run All Checks</button>

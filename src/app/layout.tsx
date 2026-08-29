@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
@@ -12,6 +13,18 @@ export const metadata: Metadata = {
   icons: {
     icon: "/logo.jpeg",
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "SkillUp",
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#3b82f6",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
@@ -21,6 +34,17 @@ export default function RootLayout({
     <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <AuthProvider>{children}</AuthProvider>
+        {typeof window !== "undefined" && (
+          <Script id="sw-register" strategy="afterInteractive">
+            {`
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                  navigator.serviceWorker.register('/sw.js').catch(() => {});
+                });
+              }
+            `}
+          </Script>
+        )}
       </body>
     </html>
   );

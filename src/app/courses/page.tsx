@@ -37,19 +37,18 @@ interface Course {
 const SOURCE_FILTERS = [
   { value: "", label: "All Courses", icon: Globe },
   { value: "igot", label: "iGOT Karmayogi", icon: BookOpen },
-  { value: "nssta_tpac", label: "NSSTA TPAC", icon: Building2 },
   { value: "internal", label: "SkillUp Internal", icon: GraduationCap },
 ];
 
 const SOURCE_COLORS: Record<string, string> = {
   igot: "bg-blue-50 text-blue-700 border-blue-100",
-  nssta_tpac: "bg-cyan-50 text-cyan-700 border-cyan-100",
+
   internal: "bg-purple-50 text-purple-700 border-purple-100",
 };
 
 const SOURCE_LABELS: Record<string, string> = {
   igot: "iGOT",
-  nssta_tpac: "NSSTA TPAC",
+
   internal: "Internal",
 };
 
@@ -124,7 +123,7 @@ export default function CoursesPage() {
             Course Catalogue
           </h1>
           <p className="text-slate-500 text-sm mt-1">
-            Browse courses from iGOT Karmayogi, NSSTA TPAC, and SkillUp
+            Browse courses from iGOT Karmayogi and SkillUp
             internal library
           </p>
         </div>

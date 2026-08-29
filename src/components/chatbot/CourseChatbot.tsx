@@ -59,6 +59,7 @@ export function CourseChatbot({
   const [isListening, setIsListening] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [contextSent, setContextSent] = useState(false);
+  const [language, setLanguage] = useState("en");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +133,7 @@ URL: https://portal.igotkarmayogi.gov.in/public/toc/${courseId}/overview
     setInput("");
     setIsTyping(true);
 
-    const response = await callAI(text, courseContext);
+    const response = await callAI(text, courseContext, language);
 
     const assistantMsg: Message = {
       id: (Date.now() + 1).toString(),
@@ -235,6 +236,23 @@ URL: https://portal.igotkarmayogi.gov.in/public/toc/${courseId}/overview
               </div>
             </div>
             <div className="flex items-center gap-1">
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="text-[10px] bg-white/20 text-white border-none rounded-lg px-1.5 py-1 cursor-pointer focus:outline-none"
+                title="Response language"
+              >
+                <option value="en" className="text-slate-800">EN</option>
+                <option value="hi" className="text-slate-800">HI</option>
+                <option value="bn" className="text-slate-800">BN</option>
+                <option value="ta" className="text-slate-800">TA</option>
+                <option value="te" className="text-slate-800">TE</option>
+                <option value="mr" className="text-slate-800">MR</option>
+                <option value="gu" className="text-slate-800">GU</option>
+                <option value="kn" className="text-slate-800">KN</option>
+                <option value="ml" className="text-slate-800">ML</option>
+                <option value="pa" className="text-slate-800">PA</option>
+              </select>
               <button
                 onClick={toggleVoiceOutput}
                 className="p-1.5 rounded-lg hover:bg-white/20 transition-colors cursor-pointer"

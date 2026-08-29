@@ -23,6 +23,8 @@ import {
   ChevronRight,
   Search,
   Bell,
+  BarChart3,
+  Flame,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -31,6 +33,7 @@ const NAV_ITEMS = [
   { href: "/dashboard/my-learning", label: "My Learning", icon: GraduationCap },
   { href: "/dashboard/competencies", label: "Competencies", icon: Target },
   { href: "/dashboard/certificates", label: "Certificates", icon: Award },
+  { href: "/dashboard/heatmap", label: "Skill Heatmap", icon: BarChart3 },
   { href: "/dashboard/profile", label: "My Profile", icon: User },
 ];
 

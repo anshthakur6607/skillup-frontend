@@ -23,6 +23,7 @@ import {
   RotateCcw,
   BarChart3,
   BookOpen,
+  Target,
 } from "lucide-react";
 
 interface Question {
@@ -31,6 +32,7 @@ interface Question {
   options: string[];
   difficulty: string;
   competency: string;
+  bloomLevel?: string;
 }
 
 interface AssessmentState {
@@ -56,6 +58,15 @@ const DIFFICULTY_COLORS: Record<string, { bg: string; text: string; label: strin
   beginner: { bg: "bg-green-100", text: "text-green-700", label: "Beginner" },
   intermediate: { bg: "bg-yellow-100", text: "text-yellow-700", label: "Intermediate" },
   advanced: { bg: "bg-red-100", text: "text-red-700", label: "Advanced" },
+};
+
+const BLOOM_LABELS: Record<string, { label: string; color: string }> = {
+  remember: { label: "Recall", color: "bg-blue-100 text-blue-700" },
+  understand: { label: "Understand", color: "bg-indigo-100 text-indigo-700" },
+  apply: { label: "Apply", color: "bg-purple-100 text-purple-700" },
+  analyze: { label: "Analyze", color: "bg-pink-100 text-pink-700" },
+  evaluate: { label: "Evaluate", color: "bg-amber-100 text-amber-700" },
+  create: { label: "Create", color: "bg-red-100 text-red-700" },
 };
 
 export default function AssessmentPage() {
@@ -273,13 +284,24 @@ function AssessmentContent() {
           </div>
         </div>
 
-        {/* Difficulty indicator */}
-        <div className="flex items-center justify-center gap-2 mb-6">
-          <BarChart3 size={14} className="text-slate-400" />
-          <span className="text-xs text-slate-400">Difficulty:</span>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${diffStyle.bg} ${diffStyle.text}`}>
-            {diffStyle.label}
-          </span>
+        {/* Difficulty + Bloom's indicator */}
+        <div className="flex items-center justify-center gap-3 mb-6 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <BarChart3 size={14} className="text-slate-400" />
+            <span className="text-xs text-slate-400">Difficulty:</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${diffStyle.bg} ${diffStyle.text}`}>
+              {diffStyle.label}
+            </span>
+          </div>
+          {question?.bloomLevel && BLOOM_LABELS[question.bloomLevel] && (
+            <div className="flex items-center gap-1.5">
+              <Target size={12} className="text-slate-400" />
+              <span className="text-xs text-slate-400">Thinking:</span>
+              <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BLOOM_LABELS[question.bloomLevel].color}`}>
+                {BLOOM_LABELS[question.bloomLevel].label}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Question card */}
