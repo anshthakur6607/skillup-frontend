@@ -62,18 +62,29 @@ export function AIVoiceChat({
     mr: "mr-IN", gu: "gu-IN", kn: "kn-IN", ml: "ml-IN", pa: "pa-IN",
   };
 
-  // Send message to backend AI
+  // Send message to backend AI (with auth token — backend requires verifyAuth)
   const sendToAI = useCallback(async (text: string): Promise<string> => {
     try {
+      const { supabase } = await import("@/lib/supabaseClient");
+      const { data: { session } } = await supabase.auth.getSession();
       const resp = await fetch("/api/ai/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ message: text, context: courseContext, language: selectedLang }),
       });
-      if (!resp.ok) throw new Error("AI request failed");
+      if (!resp.ok) {
+        const errBody = await resp.json().catch(() => null);
+        console.error("[AIVoiceChat] AI request failed:", resp.status, errBody);
+        if (resp.status === 401) return "Please log in to use the AI assistant.";
+        return "AI request failed (" + resp.status + "). Please try again.";
+      }
       const data = await resp.json();
       return data?.data?.response || "I couldn't generate a response. Please try again.";
-    } catch {
+    } catch (err) {
+      console.error("[AIVoiceChat] Network error:", err);
       return "AI service is temporarily unavailable. Please try again later.";
     }
   }, [courseContext, selectedLang]);
